@@ -1,0 +1,36 @@
+# Laravel
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+/storage/app/public
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views
+/storage/logs
+
+# Environment
+.env
+.env.backup
+.env.production
+
+# Composer
+composer.lock
+
+# NPM
+package-lock.json
+yarn.lock
+
+# IDE
+/.idea
+/.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PHPUnit
+.phpunit.result.cache
+
+# Misc
+*.log

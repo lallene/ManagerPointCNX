@@ -1,0 +1,52 @@
+services:
+  app:
+    build: .
+    container_name: laravel-app
+    volumes:
+      - .:/var/www
+    networks:
+      - laravel-net
+
+  webserver:
+    image: nginx:alpine
+    container_name: laravel-webserver
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - laravel-net
+
+  db:
+    image: mysql:5.7
+    container_name: laravel-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: managerpointcnx
+      MYSQL_USER: webhelp
+      MYSQL_PASSWORD: "@Succes/*221122@"
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - laravel-net
+
+  phpmyadmin:   
+    image: phpmyadmin/phpmyadmin
+    container_name: laravel-phpmyadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    networks:
+      - laravel-net
+
+networks:
+  laravel-net:
+    driver: bridge
+
+volumes:
+  dbdata:
