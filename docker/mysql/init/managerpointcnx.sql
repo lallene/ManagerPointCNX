@@ -2220,8 +2220,8 @@ CREATE TABLE IF NOT EXISTS `plannings` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `jour` date NOT NULL,
-  `heure_debut` time NOT NULL,
-  `heure_fin` time NOT NULL,
+  `entree` time NOT NULL,
+  `sortie` time NOT NULL,
   `semaine` varchar(190) COLLATE utf8mb4_unicode_ci NOT NULL,
   `agent_id` bigint(20) UNSIGNED DEFAULT NULL,
   `user_id` bigint(20) UNSIGNED DEFAULT NULL,
@@ -2234,7 +2234,7 @@ CREATE TABLE IF NOT EXISTS `plannings` (
 -- Dumping data for table `plannings`
 --
 
-INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `heure_debut`, `heure_fin`, `semaine`, `agent_id`, `user_id`) VALUES
+INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `entree`, `sortie`, `semaine`, `agent_id`, `user_id`) VALUES
 (1, '2025-05-25 19:47:11', '2025-05-25 19:47:11', '2025-05-19', '08:00:00', '16:00:00', '21', 1465, 1507),
 (2, '2025-05-25 19:48:31', '2025-05-25 19:48:31', '2025-05-19', '12:20:00', '20:20:00', '21', 1477, 1507),
 (3, '2025-05-25 20:19:31', '2025-05-25 20:19:31', '2025-05-20', '08:00:00', '16:00:00', '21', 1, 1507),
@@ -2702,7 +2702,7 @@ INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `heure_debut`
 (465, '2025-08-06 18:41:36', '2025-08-07 20:48:03', '2025-08-07', '08:00:00', '17:00:00', '32', 1669, 1516),
 (466, '2025-08-06 18:41:36', '2025-08-07 20:48:38', '2025-08-08', '08:00:00', '17:00:00', '32', 1669, 1516),
 (467, '2025-08-11 20:24:20', '2025-08-11 20:24:20', '2025-08-12', '08:00:00', '17:00:00', '33', 1647, 1550);
-INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `heure_debut`, `heure_fin`, `semaine`, `agent_id`, `user_id`) VALUES
+INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `entree`, `sortie`, `semaine`, `agent_id`, `user_id`) VALUES
 (468, '2025-08-11 20:24:20', '2025-08-11 20:24:20', '2025-08-12', '07:00:00', '17:00:00', '33', 1601, 1550),
 (469, '2025-08-11 20:24:20', '2025-08-11 20:24:20', '2025-08-12', '10:00:00', '19:00:00', '33', 1562, 1550),
 (470, '2025-08-11 20:24:20', '2025-08-11 20:24:20', '2025-08-12', '09:00:00', '19:00:00', '33', 1585, 1550),
@@ -3169,7 +3169,7 @@ INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `heure_debut`
 (931, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '06:00:00', '16:00:00', '37', 1574, 1550),
 (932, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '06:00:00', '15:00:00', '37', 1598, 1550),
 (933, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '07:00:00', '17:00:00', '37', 1575, 1550);
-INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `heure_debut`, `heure_fin`, `semaine`, `agent_id`, `user_id`) VALUES
+INSERT INTO `plannings` (`id`, `created_at`, `updated_at`, `jour`, `entree`, `sortie`, `semaine`, `agent_id`, `user_id`) VALUES
 (934, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '08:00:00', '17:00:00', '37', 1649, 1550),
 (935, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '10:00:00', '19:00:00', '37', 1659, 1550),
 (936, '2025-09-08 15:43:05', '2025-09-08 15:43:05', '2025-09-10', '06:00:00', '15:00:00', '37', 1633, 1550),
@@ -3329,7 +3329,7 @@ CREATE TABLE IF NOT EXISTS `pointages` (
   `semaine` varchar(190) COLLATE utf8mb4_unicode_ci NOT NULL,
   `date` date NOT NULL,
   `heure` time NOT NULL,
-  `motif` enum('debut','pause','finpause','debutpause','fin') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'debut',
+  `commentaires` enum('debut','pause','finpause','debutpause','fin') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'debut',
   `planning_id` bigint(20) UNSIGNED NOT NULL,
   `user_id` bigint(20) UNSIGNED NOT NULL,
   PRIMARY KEY (`id`),
@@ -3341,7 +3341,7 @@ CREATE TABLE IF NOT EXISTS `pointages` (
 -- Dumping data for table `pointages`
 --
 
-INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `motif`, `planning_id`, `user_id`) VALUES
+INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `commentaires`, `planning_id`, `user_id`) VALUES
 (1, '2025-06-01 21:51:21', '2025-06-01 21:51:21', '22', '2025-06-01', '14:51:21', 'debut', 32, 1609),
 (2, '2025-06-01 21:52:25', '2025-06-01 21:52:25', '22', '2025-06-01', '14:52:25', 'debut', 32, 1609),
 (3, '2025-06-01 21:52:40', '2025-06-01 21:52:40', '22', '2025-06-01', '14:52:40', 'fin', 32, 1609),
@@ -3820,7 +3820,7 @@ INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `h
 (480, '2025-07-30 14:53:53', '2025-07-30 14:53:53', '31', '2025-07-30', '07:53:53', 'debut', 286, 1495),
 (481, '2025-07-30 14:58:55', '2025-07-30 14:58:55', '31', '2025-07-30', '07:58:55', 'debut', 270, 1736),
 (482, '2025-07-30 15:02:58', '2025-07-30 15:02:58', '31', '2025-07-30', '08:02:57', 'debut', 282, 1584);
-INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `motif`, `planning_id`, `user_id`) VALUES
+INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `commentaires`, `planning_id`, `user_id`) VALUES
 (483, '2025-07-30 15:16:09', '2025-07-30 15:16:09', '31', '2025-07-30', '08:16:09', 'debut', 345, 1595),
 (484, '2025-07-30 16:00:58', '2025-07-30 16:00:58', '31', '2025-07-30', '09:00:58', 'debut', 347, 1668),
 (485, '2025-07-30 16:18:10', '2025-07-30 16:18:10', '31', '2025-07-30', '09:18:10', 'debut', 339, 1681),
@@ -4297,7 +4297,7 @@ INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `h
 (956, '2025-08-14 01:10:37', '2025-08-14 01:10:37', '33', '2025-08-13', '18:10:37', 'finpause', 497, 1714),
 (957, '2025-08-14 01:10:42', '2025-08-14 01:10:42', '33', '2025-08-13', '18:10:42', 'fin', 497, 1714),
 (958, '2025-08-14 01:24:41', '2025-08-14 01:24:41', '33', '2025-08-13', '18:24:41', 'debutpause', 489, 1610);
-INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `motif`, `planning_id`, `user_id`) VALUES
+INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `commentaires`, `planning_id`, `user_id`) VALUES
 (959, '2025-08-14 01:24:42', '2025-08-14 01:24:42', '33', '2025-08-13', '18:24:42', 'debutpause', 489, 1610),
 (960, '2025-08-14 01:24:46', '2025-08-14 01:24:46', '33', '2025-08-13', '18:24:46', 'finpause', 489, 1610),
 (961, '2025-08-14 01:24:50', '2025-08-14 01:24:50', '33', '2025-08-13', '18:24:50', 'fin', 489, 1610),
@@ -4770,7 +4770,7 @@ INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `h
 (1428, '2025-08-29 23:57:30', '2025-08-29 23:57:30', '35', '2025-08-29', '16:57:30', 'fin', 766, 1714),
 (1429, '2025-09-01 12:55:51', '2025-09-01 12:55:51', '36', '2025-09-01', '05:55:51', 'debut', 786, 1611),
 (1430, '2025-09-01 13:00:08', '2025-09-01 13:00:08', '36', '2025-09-01', '06:00:08', 'debut', 785, 1635);
-INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `motif`, `planning_id`, `user_id`) VALUES
+INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `commentaires`, `planning_id`, `user_id`) VALUES
 (1431, '2025-09-01 13:50:50', '2025-09-01 13:50:50', '36', '2025-09-01', '06:50:50', 'debut', 796, 1697),
 (1432, '2025-09-01 13:52:01', '2025-09-01 13:52:01', '36', '2025-09-01', '06:52:01', 'debut', 791, 1714),
 (1433, '2025-09-01 14:19:19', '2025-09-01 14:19:19', '36', '2025-09-01', '07:19:19', 'debut', 788, 1632),
@@ -5243,7 +5243,7 @@ INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `h
 (1900, '2025-09-13 13:56:09', '2025-09-13 13:56:09', '37', '2025-09-13', '06:56:09', 'debut', 970, 1697),
 (1901, '2025-09-13 16:53:41', '2025-09-13 16:53:41', '37', '2025-09-13', '09:53:41', 'debutpause', 974, 1623),
 (1902, '2025-09-13 17:03:57', '2025-09-13 17:03:57', '37', '2025-09-13', '10:03:57', 'debutpause', 971, 1595);
-INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `motif`, `planning_id`, `user_id`) VALUES
+INSERT INTO `pointages` (`id`, `created_at`, `updated_at`, `semaine`, `date`, `heure`, `commentaires`, `planning_id`, `user_id`) VALUES
 (1903, '2025-09-13 17:06:08', '2025-09-13 17:06:08', '37', '2025-09-13', '10:06:08', 'debut', 972, 1649),
 (1904, '2025-09-13 17:45:55', '2025-09-13 17:45:55', '37', '2025-09-13', '10:45:55', 'finpause', 974, 1623),
 (1905, '2025-09-13 17:45:59', '2025-09-13 17:45:59', '37', '2025-09-13', '10:45:59', 'fin', 974, 1623),

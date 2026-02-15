@@ -27,6 +27,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     intl \
     opcache
 
+# Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Répertoire de travail
 WORKDIR /var/www/application
