@@ -90,4 +90,36 @@ class Pointage extends Model
         if (!$this->planning) return 0;
         return (int)$this->minutes_travaillees - (int)$this->planning->minutes_prevues;
     }
+
+    /**
+ * Détermine si l'agent est en retard par rapport au planning.
+ * Utilisé dans la vue par $p->is_late
+ */
+public function getIsLateAttribute(): bool
+{
+    if (!$this->entree || !$this->planning || !$this->planning->entree) {
+        return false;
+    }
+
+    // On compare l'heure réelle et l'heure prévue (en ignorant la date pour ne comparer que l'heure)
+    $heurePrevue = Carbon::parse($this->planning->entree)->format('H:i:s');
+    $heureReelle = $this->entree->format('H:i:s');
+
+    return $heureReelle > $heurePrevue;
+}
+
+/**
+ * Calcule l'écart de retard en format HH:mm.
+ * Utilisé dans la vue par $p->ecart_retard
+ */
+public function getEcartRetardAttribute(): ?string
+{
+    if (!$this->is_late) return null;
+
+    $prevu = Carbon::parse($this->planning->entree);
+    $reel = $this->entree;
+
+    // Différence absolue entre les deux heures
+    return $reel->diff($prevu)->format('%H:%I');
+}
 }

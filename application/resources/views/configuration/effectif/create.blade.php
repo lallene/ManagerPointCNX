@@ -102,7 +102,7 @@
             <div class="col-md-12">
                 <div class="card shadow-sm">
                     <div class="card-body">
-                        <form method="POST" class="row g-3" action="{{ route('agents.store') }}"
+                        <form method="POST" class="row g-3" action="{{ route('effectif.store') }}"
                             enctype="multipart/form-data">
                             @csrf
 
@@ -161,7 +161,7 @@
                             </div>
 
                             <div class="col-12 text-center mt-3">
-                                <a href="{{ route('effectif.index') }}" class="btn btn-danger"><i class="fa fa-close"></i>
+                                <a href="{{ route('effectifs') }}" class="btn btn-danger"><i class="fa fa-close"></i>
                                     Annuler</a>
                                 <button class="btn btn-primary"><i class="fa fa-save"></i> Ajouter</button>
                             </div>

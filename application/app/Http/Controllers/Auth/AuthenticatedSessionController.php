@@ -13,30 +13,33 @@ use App\Providers\RouteServiceProvider;
 class AuthenticatedSessionController extends Controller
 {
     public function store(Request $request)
-    {
-        // Validation des informations de connexion
-        $request->validate([
-            'work_email' => 'required|work_email',
-            'password' => 'required',
-        ]);
+{
+    // 1. Validation : Utilise 'email' pour la syntaxe
+    $request->validate([
+        'work_email' => 'required|email', 
+        'password' => 'required',
+    ]);
 
-        // Tenter la connexion
-        if (Auth::attempt($request->only('work_email', 'password'))) {
-            $user = Auth::user();
+    // 2. Tentative de connexion
+    // On utilise les credentials basés sur work_email
+    $credentials = $request->only('work_email', 'password');
 
-            // Si c'est la première connexion de l'utilisateur
-            if ($user->password_first_connection) {
-                // Rediriger vers la page de modification du mot de passe
-                return redirect()->route('changePassword');
-            }
+    if (Auth::attempt($credentials)) {
+        $user = Auth::user();
 
-            // Sinon, rediriger vers la page d'accueil ou tableau de bord
-            return redirect()->intended(RouteServiceProvider::HOME);
+        // 3. Logique de première connexion
+        if ($user->password_first_connection) {
+            // S'assurer que la route 'changePassword' est bien celle définie dans web.php
+            return redirect()->route('changePassword');
         }
 
-        // Si la connexion échoue, retourner avec un message d'erreur
-        return back()->withErrors([
-            'work_email' => 'Les informations d\'identification fournies sont incorrectes.',
-        ]);
+        // 4. Redirection vers HOME (Laravel 11 utilise souvent une chaîne directe ou une constante)
+        return redirect()->intended('/home'); 
     }
+
+    // 5. Échec : Retour avec erreur et input pour ne pas retaper l'email
+    return back()->withErrors([
+        'work_email' => 'Les informations d\'identification fournies sont incorrectes.',
+    ])->withInput($request->only('work_email'));
+}
 }

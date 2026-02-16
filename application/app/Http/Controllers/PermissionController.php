@@ -3,116 +3,86 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 class PermissionController extends Controller
 {
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        $this->middleware('auth');
-   //     $this->middleware('role:IT');
 
-    }
-
-    /**
-     * Show the application dashboard.
-     *
-     * @return \Illuminate\Contracts\Support\Renderable
-     */
-    public function index()
+    public function index(): View
     {
         $permissions = Permission::all();
-        return view('configuration.permission.liste', ['titre' => "Liste des Permissions", 'permissions' => $permissions]);
+        return view('configuration.permission.liste', [
+            'titre' => "Liste des Permissions", 
+            'permissions' => $permissions
+        ]);
     }
 
-    public function create()
+    public function create(): View
     {
-        $permissions = Permission::all();
-        return view('configuration.permission.create', ['titre' => "Ajouter une Permission", 'permissions' => $permissions]);
+        return view('configuration.permission.create', [
+            'titre' => "Ajouter une Permission"
+        ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name' => 'required|unique:permissions,name',
-            'guard_name' => 'required'
+            'name' => 'required|string|max:255|unique:permissions,name',
+            'guard_name' => 'required|string|max:255'
         ]);
 
-        Permission::create([
-            'name' => $request->name,
-            'guard_name' => $request->guard_name
-        ]);
+        Permission::create($request->only('name', 'guard_name'));
 
         return redirect()->route('permission.index')->with('success', 'Permission créée !');
     }
 
-    public function edit($id)
+    public function edit(int $id): View
     {
-        $permission = Permission::find($id);
-        return view('configuration.permission.edit', ['titre' => "Modifier une Permission ".$permission->name, 'role' => $permission]);
+        $permission = Permission::findOrFail($id);
+        return view('configuration.permission.edit', [
+            'titre' => "Modifier la Permission : " . $permission->name, 
+            'role' => $permission // Gardé 'role' pour la compatibilité avec ta vue existante
+        ]);
     }
 
-        public function update(Request $request, $id)
+    public function update(Request $request, int $id): RedirectResponse
     {
-        // 1. Validation des données (Crucial pour la sécurité)
         $request->validate([
             'name' => 'required|string|max:255|unique:permissions,name,' . $id,
             'guard_name' => 'required|string|max:255',
         ]);
 
-        // 2. Récupération de l'instance
-        $permission = Permission::findOrFail($id);
-
         try {
-            // 3. Mise à jour de tous les champs
-            $permission->name = $request->input('name');
-            $permission->guard_name = $request->input('guard_name');
-            $permission->save();
+            $permission = Permission::findOrFail($id);
+            $permission->update($request->only('name', 'guard_name'));
 
-            // 4. Feedback positif (Notification)
             return redirect()->route('permission.index')
-                            ->with('success', 'La permission a été mise à jour avec succès.');
-
+                             ->with('success', 'La permission a été mise à jour avec succès.');
         } catch (\Exception $e) {
-            // 5. Gestion d'erreur propre
             return redirect()->back()
-                            ->withInput()
-                            ->with('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
+                             ->withInput()
+                             ->with('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
         }
     }
 
+    public function destroy(int $id): RedirectResponse
+    {
+        try {
+            $permission = Permission::findOrFail($id);
 
-    /**
- * Supprime une permission de la base de données.
- */
-public function destroy($id)
-{
-    try {
-        // 1. On récupère la permission ou on renvoie une erreur 404 si elle n'existe pas
-        $permission = \Spatie\Permission\Models\Permission::findOrFail($id);
+            // Sécurité Lead Dev : On empêche de supprimer si c'est utilisé
+            if ($permission->roles()->count() > 0) {
+                 return redirect()->back()->with('error', 'Action annulée : cette permission est liée à des rôles.');
+            }
 
-        // 2. Sécurité : On peut vérifier si la permission est liée à des rôles avant de supprimer
-        // if ($permission->roles()->count() > 0) {
-        //    return redirect()->back()->with('error', 'Impossible de supprimer : cette permission est utilisée par des rôles.');
-        // }
-
-        // 3. Suppression
-        $permission->delete();
-
-        // 4. Retour avec message de succès
-        return redirect()->route('permission.index')
-                         ->with('success', 'La permission a été supprimée avec succès.');
-
-    } catch (\Exception $e) {
-        // En cas d'erreur imprévue
-        return redirect()->route('permission.index')
-                         ->with('error', 'Erreur lors de la suppression : ' . $e->getMessage());
+            $permission->delete();
+            return redirect()->route('permission.index')
+                             ->with('success', 'La permission a été supprimée.');
+        } catch (\Exception $e) {
+            return redirect()->route('permission.index')
+                             ->with('error', 'Erreur lors de la suppression.');
+        }
     }
-}
 }

@@ -51,17 +51,13 @@ class LoginController extends Controller
      * @param  mixed  $user
      * @return \Illuminate\Http\RedirectResponse
      */
-    protected function authenticated(Request $request, $user)
+     protected function authenticated(Request $request, $user)
     {
-
-
-        // Vérifier si c'est la première connexion
+        // Si le flag est à true (1), redirection forcée
         if ($user->password_first_connection) {
-            // Rediriger vers la page de changement de mot de passe
             return redirect()->route('changePassword');
         }
 
-        // Sinon, rediriger vers la page d'accueil
         return redirect()->intended($this->redirectPath());
     }
 
@@ -82,20 +78,27 @@ class LoginController extends Controller
      * @return \Illuminate\Http\RedirectResponse
      */
 
-public function updatePassword(Request $request)
-{
-    $request->validate([
-        'password' => 'required|string|min:8|confirmed',
-    ]);
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8|confirmed',
+        ], [
+            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.'
+        ]);
 
-    $user = User::find(Auth::user()->id); // Récupère l'utilisateur authentifié
+        // Récupération directe de l'objet utilisateur authentifié
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-    // Si l'utilisateur existe, vous pouvez utiliser la méthode 'save'
-    $user->password = Hash::make($request->password);  // Mise à jour du mot de passe
-    $user->save();  // Sauvegarde dans la base de données
+        // Mise à jour du mot de passe ET remise à zéro du flag de première connexion
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_first_connection' => false, // Important !
+        ]);
 
-    return redirect()->route('home')->with('success', 'Votre mot de passe a été modifié avec succès!');
-}
+        return redirect()->route('home')->with('success', 'Votre mot de passe a été modifié avec succès !');
+    }
 
     /**
      * Déconnexion de l'utilisateur.

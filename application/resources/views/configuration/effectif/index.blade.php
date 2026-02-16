@@ -72,7 +72,7 @@
 
         <div class="card shadow-sm border-0 mb-5">
             <div class="import-section">
-                <form action="{{ route('import_agent') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('effectif.import') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="row align-items-end g-3">
                         <div class="col-md-5">
@@ -88,7 +88,7 @@
                             </button>
                         </div>
                         <div class="col-md-5 text-md-end">
-                            <a href="{{ route('agents.create') }}" class="btn btn-primary btn-sm shadow-sm px-4">
+                            <a href="{{ route('effectif.create') }}" class="btn btn-primary btn-sm shadow-sm px-4">
                                 <i class="fa fa-plus-circle me-1"></i> Ajout Manuel
                             </a>
                         </div>
@@ -109,6 +109,7 @@
                                 <th>Email</th>
                                 <th>Projet</th>
                                 <th>Responsable</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                     </table>
@@ -131,31 +132,34 @@
 
     <script>
         $(document).ready(function() {
+            // Sécurité : Destruction de l'instance existante
             if ($.fn.DataTable.isDataTable('#agentTable')) {
                 $('#agentTable').DataTable().destroy();
             }
 
-            $('#agentTable').DataTable({
+            const table = $('#agentTable').DataTable({
                 processing: true,
                 serverSide: true,
                 ajax: {
-                    url: "{{ route('agents.ajax') }}",
+                    url: "{{ route('effectif.ajax') }}",
                     type: "GET",
-                    error: function(xhr, error, thrown) {
+                    error: function(xhr) {
                         console.error("Erreur DataTables:", xhr.responseText);
                     }
                 },
                 columns: [{
                         data: 'site',
-                        name: 'projets.site_id'
+                        name: 'site', // Lié au filterColumn du contrôleur
+                        orderable: false,
+                        searchable: true
                     },
                     {
                         data: 'workday_id',
-                        name: 'agents.workday_id'
+                        name: 'workday_id'
                     },
                     {
-                        data: null,
-                        name: 'agents.nom',
+                        data: 'nom', // On simplifie le data pour le tri natif
+                        name: 'nom',
                         render: function(data, type, row) {
                             if (!row.nom) return '-';
                             const firstPrenom = row.prenom ? row.prenom.split(' ')[0] : '';
@@ -164,44 +168,76 @@
                     },
                     {
                         data: 'fonction',
-                        name: 'agents.fonction'
+                        name: 'fonction'
                     },
                     {
                         data: 'work_email',
-                        name: 'agents.work_email'
+                        name: 'work_email'
                     },
                     {
                         data: 'projet',
-                        name: 'projets.designation'
+                        name: 'projet', // Lié au filterColumn via table pivot
+                        orderable: false,
+                        searchable: true
                     },
                     {
                         data: 'manager_nom',
-                        name: 'agents.manager'
+                        name: 'manager' // On pointe vers la colonne physique pour le tri/recherche
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center',
+                        render: function(data, type, row) {
+                            const editUrl = `{{ url('effectif') }}/${row.id}/edit`;
+                            const deleteUrl = `{{ url('effectif') }}/${row.id}`;
+
+                            return `
+                            <div class="btn-group shadow-sm">
+                                <a href="${editUrl}" class="btn btn-outline-primary btn-sm" title="Modifier">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                        onclick="confirmDelete('${deleteUrl}', '${row.nom}')" title="Supprimer">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                        }
                     }
                 ],
                 dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
                 buttons: [{
                         extend: 'excel',
-                        className: 'btn btn-outline-success btn-sm',
-                        text: 'Excel'
+                        className: 'btn btn-success btn-sm',
+                        text: '<i class="fas fa-file-excel me-1"></i> Excel'
                     },
                     {
                         extend: 'pdf',
-                        className: 'btn btn-outline-danger btn-sm',
-                        text: 'PDF'
+                        className: 'btn btn-danger btn-sm',
+                        text: '<i class="fas fa-file-pdf me-1"></i> PDF'
                     }
                 ],
                 pageLength: 50,
+                order: [
+                    [2, 'asc']
+                ], // Tri par nom par défaut
                 language: {
-                    "search": "Rechercher :",
-                    "processing": "Chargement des données...",
-                    "emptyTable": "Aucun agent trouvé",
-                    "paginate": {
-                        "next": "Suivant",
-                        "previous": "Précédent"
-                    }
+                    "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json" // Traduction complète officielle
                 }
             });
         });
+
+        function confirmDelete(url, name) {
+            if (confirm(`Voulez-vous vraiment supprimer l'agent ${name} ?`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = url;
+                form.innerHTML = `@csrf @method('DELETE')`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
     </script>
 @endpush

@@ -185,41 +185,36 @@
 
                     <div class="collapse navbar-collapse" id="navbarNav">
                         <ul class="navbar-nav mx-auto">
-                            @hasanyrole('IT|Ressources Humaines')
+                            {{-- Projets accessibles pour IT et RH --}}
+                            @hasanyrole('IT|RH')
                                 <li class="nav-item"><a class="nav-link @routeActive('projet.*')"
                                         href="{{ route('projet.index') }}">Projets</a></li>
                             @endhasanyrole
 
-                            @hasanyrole('IT|Ressources Humaines|Responsables d’équipe')
+                            {{-- Effectifs pour IT, RH et tous les grades Managers --}}
+                            @hasanyrole('IT|RH|Manager|Top Manager|Directeur')
                                 <li class="nav-item"><a class="nav-link @routeActive('effectifs')"
                                         href="{{ route('effectifs') }}">Effectifs</a></li>
                             @endhasanyrole
 
-                            @role('Responsables d’équipe')
+                            {{-- Planification pour ceux qui gèrent des équipes --}}
+                            @hasanyrole('Manager|Top Manager')
                                 <li class="nav-item"><a class="nav-link @routeActive('planification')"
                                         href="{{ route('planification') }}">Planification</a></li>
-                            @endrole
+                            @endhasanyrole
 
-                            <li class="nav-item"><a class="nav-link @routeActive('planning.group')"
-                                    href="{{ route('planning.group') }}">Plannings</a></li>
+                            {{-- Public / Tous --}}
+                            <li class="nav-item"><a class="nav-link @routeActive('planning.global')"
+                                    href="{{ route('planning.global') }}">Plannings</a></li>
+                            <li class="nav-item"><a class="nav-link @routeActive('pointage.index')"
+                                    href="{{ route('pointage.index') }}">Pointages</a></li>
 
-                            @role('Manager')
-                                @unlessrole('IT')
-                                    <li class="nav-item"><a class="nav-link @routeActive('pointages.create')"
-                                            href="{{ route('pointages.create') }}">Suivi</a></li>
-                                @endunlessrole
-                            @endrole
-
-                            <li class="nav-item"><a class="nav-link @routeActive('pointages.index')"
-                                    href="{{ route('pointages.index') }}">Pointages</a></li>
-
+                            {{-- Administration : Uniquement IT --}}
                             @role('IT')
                                 <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle @routeActive('profil.*|permission.*|users.*')" href="#"
+                                    <a class="nav-link dropdown-toggle @routeActive('permission.*|users.*')" href="#"
                                         data-bs-toggle="dropdown">Administration</a>
                                     <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="{{ route('profil.index') }}"><i
-                                                    class="fas fa-user-shield me-2"></i> Profils</a></li>
                                         <li><a class="dropdown-item" href="{{ route('permission.index') }}"><i
                                                     class="fas fa-key me-2"></i> Permissions</a></li>
                                         <li><a class="dropdown-item" href="{{ route('users.index') }}"><i

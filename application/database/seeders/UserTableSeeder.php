@@ -6,41 +6,82 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\User;
+
 
 class UserTableSeeder extends Seeder
 {
-    public function run()
-    {
-        // 1. Récupérer uniquement les agents qui ont une adresse @concentrix.com
-        // On utilise LIKE pour filtrer au niveau de la requête SQL (plus performant)
-        $agents = DB::table('agents')
-                    ->where('work_email', 'LIKE', '%@concentrix.com')
-                    ->get();
+   public function run()
+{
+    $roleMapping = [
+         "DIRECTEUR D'ACTIVITE" => "Top Manager",
+            "DIRECTEUR RH FILIALE" => "RH",
+            "HR BUSINESS PARTNER" => "RH",
+            'SUPERVISEUR SENIOR' => "Top Manager",
+            'ASSISTANT(E) RH' => "RH",
+            "RESPONSABLE D'ACTIVITE" => "Top Manager",
+            'FORMATEUR METIER' => "Manager",
+            'CHEF DE PROJETS' => "Top Manager",
+            'Supervisor Quality, Trainee (Non Agent)' => "Manager",
+            'CONTROLEUR QUALITE PRODUCTION' => "Manager",
+            'TECHNICIEN INFORMATIQUE' => "IT",
+            'RESPONSABLE TECHNIQUE SITES' => "IT",
+            'INGENIEUR QUALITE FORMATION' => "Manager",
+            'Formateur Métier Senior' => "Top Manager",
+            'EXPERT METIER' => "Manager",
+            'Contrôleur Qualité Mission' => "Manager",
+            'LOCAL IT TEAM LEADER' => "IT",
+            'FORMATEUR METIER SENIOR' => "Top Manager",
+            'Quality Lead' => "Manager",
+            'DIRECTEUR DE SITE' => "Directeur",
+            'Team Leader Trainee, Operations' => "Manager",
+            'Superviseur' => "Manager",
+            'Expert Produit Mission' => "Manager",
+            'Trainer II' => "Manager",
+            'CHEF DE PROJETS AMEL CONT SITE' => "Manager",
+            'CHEF DE PROJETS RH' => "RH",
+            'People Solutions Generalist I' => "RH",
+            'RESPONSABLE QUALITE FORMATION' => "Top Manager",
+            'Sr. Quality Evaluator' => "Manager",
+            'Responsable opération RH' => "RH",
+            'Superviseur Senior (mission)' => "Manager",
+            'Trainer I' => "Manager",
+            'Contrôleur Qualité Production (mission)' => "Manager",
+            'Team Leader, Operations' => "Manager",
+            'Quality Evaluator - Trainee (Agent)' => "Manager",
+            'Contrôleur Qualité (mission)' => "Manager",
+            'Expert Produit' => "Manager",
+            'CONTROLEUR QUALITE' => "Manager",
+            'Representative, People Solutions' => "RH",
+            'ASSISTANTE RH' => "RH",
+            'SUBSIDIARIES CEO' => "Directeur",
+    ];
 
-        $this->command->info("Filtrage terminé : " . $agents->count() . " agents valides trouvés avec une adresse @concentrix.com.");
+    $agents = DB::table('agents')->get();
 
-        foreach ($agents as $agent) {
-            // Vérification double au cas où (sécurité)
-            $userExists = DB::table('users')->where('work_email', $agent->work_email)->exists();
-
-            if (!$userExists) {
-                
-                $nomComplet = trim($agent->nom . ' ' . ($agent->prenom ?? $agent->prenoms ?? ''));
-
-                DB::table('users')->insert([
-                    'name'                       => $nomComplet,
-                    'work_email'                 => $agent->work_email,
-                    // Utilisation du workday_id comme mot de passe initial (haché)
-                    'password'                   => Hash::make($agent->workday_id), 
-                    'password_first_connection'  => 1,
-                    'email_verified_at'          => now(),
-                    'remember_token'             => Str::random(10),
-                    'created_at'                 => now(),
-                    'updated_at'                 => now(),
-                ]);
+    foreach ($agents as $agent) {
+        // On nettoie la chaîne pour la comparaison (Majuscules + retrait espaces inutiles)
+        $fonctionAgent = trim(strtoupper($agent->fonction));
+        
+        // On cherche le rôle (on transforme aussi les clés du mapping en majuscules pour comparer)
+        $roleName = null;
+        foreach ($roleMapping as $key => $role) {
+            if (strtoupper($key) === $fonctionAgent) {
+                $roleName = $role;
+                break;
             }
         }
 
-        $this->command->info("La table Users a été peuplée uniquement avec les comptes @concentrix.com.");
+        if ($roleName && !User::where('work_email', $agent->work_email)->exists()) {
+            $user = User::create([
+                'name' => $agent->prenom . ' ' . $agent->nom,
+                'work_email' => $agent->work_email,
+                'password' => Hash::make($agent->workday_id),
+                'password_first_connection' => true,
+            ]);
+
+            $user->assignRole($roleName);
+        }
     }
+}
 }

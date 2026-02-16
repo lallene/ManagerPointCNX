@@ -16,13 +16,19 @@ class CreateUsersTable extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('work_email')->unique();
+            
+            // On ajoute ->index() car tu fais des jointures SQL dessus dans UtilisateurController::ajax
+            $table->string('work_email')->unique()->index(); 
+            
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             
-            // Supprimez ->after('password'), placez juste la colonne ici
-            $table->string('password_first_connection')->nullable();
-
+            /**
+             * Correction Lead Dev : 
+             * Au lieu d'un string, on utilise un boolean pour le flag de première connexion.
+             * C'est plus léger en base et plus simple à tester : if($user->password_first_connection)
+             */
+            $table->boolean('password_first_connection')->default(true);
 
             $table->rememberToken();
             $table->timestamps();

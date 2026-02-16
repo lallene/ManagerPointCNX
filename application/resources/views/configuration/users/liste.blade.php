@@ -144,14 +144,15 @@
                 serverSide: true,
                 ajax: "{{ route('users.ajax') }}",
                 columns: [{
-                        data: 'user_id',
-                        name: 'user_id'
+                        // Correction ici : data est 'id' et non 'user_id'
+                        data: 'id',
+                        name: 'id'
                     },
                     {
                         data: 'name',
                         name: 'name',
                         render: function(data) {
-                            return '<span class="fw-bold text-dark">' + data + '</span>';
+                            return '<span class="fw-bold text-dark">' + (data || '-') + '</span>';
                         }
                     },
                     {
@@ -160,26 +161,29 @@
                     },
                     {
                         data: 'fonction',
-                        name: 'agents.fonction'
+                        name: 'fonction', // Correspond au addColumn('fonction')
+                        orderable: false
                     },
                     {
-                        data: 'role',
-                        name: 'role',
+                        data: 'role_name',
+                        name: 'role_name', // Correspond au addColumn('role_name')
                         render: function(data) {
-                            var badgeClass = data === 'Admin' ?
-                                'bg-light text-danger border-danger' :
-                                'bg-light text-primary border-primary';
-                            return '<span class="badge border ' + badgeClass + '">' + data +
-                                '</span>';
-                        }
+                            if (!data)
+                                return '<span class="badge border bg-light text-secondary">Aucun</span>';
+                            // Puisque ton contrôleur envoie déjà le HTML des badges, on retourne juste data
+                            return data;
+                        },
+                        orderable: false
                     },
                     {
-                        data: 'projet',
-                        name: 'projet'
+                        data: 'projet_nom',
+                        name: 'projet_nom', // Correspond au addColumn('projet_nom')
+                        orderable: false
                     },
                     {
-                        data: 'site',
-                        name: 'site'
+                        data: 'site_nom',
+                        name: 'site_nom', // Correspond au addColumn('site_nom')
+                        orderable: false
                     },
                     {
                         data: 'action',
@@ -202,6 +206,9 @@
                     }
                 ],
                 pageLength: 50,
+                order: [
+                    [0, 'desc']
+                ], // Tri par ID décroissant par défaut
                 language: {
                     "search": "Rechercher :",
                     "lengthMenu": "Afficher _MENU_",

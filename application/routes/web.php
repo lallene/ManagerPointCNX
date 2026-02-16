@@ -1,146 +1,97 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController; // IMPORT MANQUANT
 use App\Http\Controllers\AgentController;
-use App\Http\Controllers\UtilisateurController;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\ProjetController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\PointageController;
-use App\Http\Controllers\RapportControlleur;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\RoleController;
-
-use App\Http\Livewire\Dashboard;
-use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
-*/
-
-Route::get('/home/data', [HomeController::class, 'ajaxData'])->name('home.data'); // flux JSON
-Route::get('/home/weeklyReport', [HomeController::class, 'weeklyReport'])->name('home.weeklyReport'); // flux JSON
-Route::get('/manager/export/excel', [HomeController::class, 'exportExcel'])->name('manager.export.excel');
-Route::get('/manager/export/pdf', [HomeController::class, 'exportPdf'])->name('manager.export.pdf');
-Route::get('/findProjet/{id}', [HomeController::class, 'findProjet'])->name('findProjet');
-
-Auth::routes();
+use App\Http\Controllers\ProjetController;
+use App\Http\Controllers\SiteController;
+use App\Http\Controllers\UtilisateurController;
 
 
-
-Route::group(['middleware' => ['auth']], function() {
-    Route::resource('profil', \App\Http\Controllers\RoleController::class);
-    Route::resource('permission', \App\Http\Controllers\PermissionController::class);
-    Route::resource('projet', \App\Http\Controllers\ProjetController::class);
-    Route::resource('effectif', \App\Http\Controllers\AgentController::class);
+// --- ROUTES PUBLIQUES ---
+Route::get('/', function () {
+    return redirect()->route('login');
 });
 
+Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [LoginController::class, 'login']);
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+// --- ROUTES SOUS AUTHENTIFICATION ---
+Route::middleware(['auth'])->group(function () {
 
+    // Gestion du changement de mot de passe (Lié à ton LoginController)
+    Route::get('/change-password', [LoginController::class, 'showChangePasswordForm'])->name('changePassword');
+    Route::post('/update-password', [LoginController::class, 'updatePassword'])->name('updatePassword');
 
-Route::prefix('utilisateurs')->group(function() {
-    Route::get('/',                     [UtilisateurController::class, 'index'])->name('users.index');
-    Route::get('/create',               [UtilisateurController::class, 'create'])->name('users.create');
-    Route::post('/',                    [UtilisateurController::class, 'store'])->name('users.store');
-    Route::get('/ajax',                 [UtilisateurController::class, 'ajax'])->name('users.ajax');
-    Route::get('{id}',                  [UtilisateurController::class, 'show'])->name('users.show');
-    Route::get('{id}/edit',             [UtilisateurController::class, 'edit'])->name('users.edit');
-    Route::put('{id}',                  [UtilisateurController::class, 'update'])->name('users.update');
-    Route::delete('{id}',               [UtilisateurController::class, 'destroy'])->name('users.destroy');
+    // Dashboard & Accueil
+    Route::get('/home', [DashboardController::class, 'index'])->name('home');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Pointages
+    Route::prefix('pointage')->group(function () {
+        Route::get('/', [PointageController::class, 'index'])->name('pointage.index');
+        Route::get('/create', [PointageController::class, 'create'])->name('pointage.create');
+        Route::post('/store', [PointageController::class, 'store'])->name('pointage.store');
+        Route::delete('/{pointage}', [PointageController::class, 'destroy'])->name('pointage.destroy');
+        Route::get('/pointages/api/data', [PointageController::class, 'getPointageData'])->name('pointages.global');
+        Route::get('/api/projets-by-site', [PointageController::class, 'getProjetsBySite'])->name('api.projets.by.site');
+    });
+
+    // Plannings
+    Route::prefix('planning')->group(function () {
+        Route::get('/', [PlanningController::class, 'index'])->name('planification');
+        Route::get('/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
+        Route::get('/graphique', [PlanningController::class, 'planningJourneeGraphique'])->name('planning.graph');
+        Route::post('/import', [PlanningController::class, 'import'])->name('planning.import');
+        Route::get('/projet', [PlanningController::class, 'showGroupPlanningView'])->name('planning.projet');
+        Route::get('/api/data', [PlanningController::class, 'getPlanningData'])->name('getPlanningData');
+    });
 });
 
+// --- ROUTES RH / IT / MANAGERS ---
+Route::middleware(['auth', 'role:RH|IT|Manager|Top Manager|Directeur'])->group(function () {
+    Route::prefix('effectif')->group(function () {
+        Route::get('/liste', [AgentController::class, 'index'])->name('effectifs'); 
+        Route::get('/create', [AgentController::class, 'create'])->name('effectif.create');
+        Route::post('/store', [AgentController::class, 'store'])->name('effectif.store');
+        Route::get('/{id}/edit', [AgentController::class, 'edit'])->name('effectif.edit');
+        Route::put('/{id}/update', [AgentController::class, 'update'])->name('effectif.update');
+        Route::delete('/{id}/destroy', [AgentController::class, 'destroy'])->name('effectif.destroy');
+        Route::post('/import', [AgentController::class, 'import'])->name('effectif.import');
+        Route::get('/ajax', [AgentController::class, 'ajax'])->name('effectif.ajax');
+    });
+});
 
-Route::get('change-password', [UtilisateurController::class, 'showChangePasswordForm'])->name('changePassword');
-Route::post('change-password', [UtilisateurController::class, 'updatePassword'])->name('updatePassword');
-Route::post('/effectif/import', [App\Http\Controllers\AgentController::class, 'import'])->name('import_agent');
-
-
-
-Route::get('/agents', [AgentController::class, 'index'])->name('agents.index');
-Route::get('/agents/create', [AgentController::class, 'create'])->name('agents.create');
-Route::post('/agents/store', [AgentController::class, 'store'])->name('agents.store');
-Route::get('/agents/ajax', [AgentController::class, 'ajax'])->name('agents.ajax');
-Route::get('/projets/ajax', [ProjetController::class, 'ajax'])->name('projets.ajax');
-
-
-
-Route::get('api/agents', [AgentController::class, 'index']);
-Route::get('/effectifs',[App\Http\Controllers\AgentController::class, 'liste'])->name('effectifs');
-Route::get('/planification',[App\Http\Controllers\PlanningController::class, 'index'])->name('planification');
-Route::post('/planning', [PlanningController::class, 'store'])->name('planning.store');
-Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.PlanningGlobal');
-Route::get('/projets-par-site/{site}', [HomeController::class, 'getProjetsParSite'])->name('projets.par.site');
-Route::post('/plannings/import', [PlanningController::class, 'import'])->name('plannings.import');
-Route::get('/planning/journee-graph', [PlanningController::class, 'planningJourneeGraphique'])->name('planning.journee.graphique')->middleware('role:Manager');
-
-
-// 1. La route qui affiche la page vide avec les filtres
-Route::get('/planning/group', [PlanningController::class, 'showGroupPlanningView'])->name('planning.group');
-
-// 2. La route API que le JavaScript appellera pour remplir le tableau
-Route::get('/api/planning/group-data', [PlanningController::class, 'getPlanningData'])->name('planning.group.data');
-
-
-
-// Groupe Pointages
-Route::prefix('pointages')->middleware('auth')->group(function () {
-    // 1. La page d'affichage (Le tableau vide avec les filtres)
-    Route::get('/suivi-hebdo', [PointageController::class, 'index'])->name('pointages.index');
+// --- ADMINISTRATION (IT SEULEMENT) ---
+Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function () {
     
-    // 2. Le flux de données JSON (Appelé par jQuery)
-    Route::get('/api-global', [PointageController::class, 'PointageGlobal'])->name('pointages.global');
-
-    // Autres routes existantes
-    Route::get('/creer', [PointageController::class, 'create'])->name('pointages.create')->middleware('role:Manager');
-    Route::post('/', [PointageController::class, 'store'])->name('pointages.store');
+        // Dans web.php, à l'intérieur du groupe IT
+    Route::resource('permissions', PermissionController::class)->names([
+        'index' => 'permission.index',
+        'create' => 'permission.create',
+        'store' => 'permission.store',
+        'edit' => 'permission.edit',
+        'update' => 'permission.update',
+        'destroy' => 'permission.destroy',
+    ]);
+    
+    // Projets & Sites
+    Route::resource('projet', ProjetController::class)->except(['show']);
+    Route::get('projet-ajax', [ProjetController::class, 'ajax'])->name('projets.ajax');
+    Route::resource('site', SiteController::class)->except(['show']);
+    
+    // Utilisateurs
+    Route::get('/users/ajax', [UtilisateurController::class, 'ajax'])->name('users.ajax');
+    Route::resource('users', UtilisateurController::class);
 });
 
+Route::get('/forgot-password', function () {
+    return "Veuillez contacter l'administrateur IT pour réinitialiser votre mot de passe.";
+})->name('password.request');
 
-Route::get('/rapport/pointages', [RapportControlleur::class, 'index'])->name('rapport.pointages');
-Route::get('/rapport/pointages/json', [RapportControlleur::class, 'json'])->name('rapport.pointages.json');
-Route::get('/rapport/pointages/export', [RapportControlleur::class, 'exportExcel'])->name('rapport.pointages.export');
-Route::post('/importprojet', [App\Http\Controllers\ProjetController::class, 'import']);
-Route::post('/importemploi', [App\Http\Controllers\EmploiController::class, 'import']);
-Route::post('/importsubfonction', [App\Http\Controllers\Sub_FonctionController::class, 'import']);
-Route::post('/importmotif', [App\Http\Controllers\Motif_consultationController::class, 'import']);
-Route::post('/importmatricule', [App\Http\Controllers\MatriculeControlleur::class, 'import']);
-
-
-
-
-Route::get('/', [App\Http\Controllers\DashboardController::class, 'index'])->name('home')->middleware('auth');
-
-
-Route::get('/rapport', [App\Http\Controllers\RapportController::class, 'index'])->name('rapport');
-Route::get('/rapport/search', [App\Http\Controllers\RapportController::class, 'rapport'])->name('rapport_search');
-Route::get('/rapport/envoi}', [App\Http\Controllers\RapportController::class, 'export'])->name('rapportsend');
-Route::get('/rapport/envoi/', [App\Http\Controllers\SearchController::class, 'export'])->name('rapportsearch');
-Route::get('/home/preview', [App\Http\Controllers\HomeController::class, 'preview'])->name('dashboardpreview');
-Route::get('/home/download', [App\Http\Controllers\HomeController::class, 'download'])->name('dashboarddownload');
-Route::get('/send-rapport', [App\Http\Controllers\RapportController::class, 'sendMailWitchExecel'])->name('sendMailWitchExecel');
-Route::get('/rapport/taux-absence', [HomeController::class, 'tauxAbsence'])->name('rapport.taux.absence');
-
-
-Route::get('profil/permission/{id}', [RoleController::class, 'permissions'])->name('profil.permissions');
-Route::get('profil/permission/add/{id}', [RoleController::class, 'addPermission'])->name('profil.permissions.add');
-Route::post('profil/permission/grant/{id}', [RoleController::class, 'grantPermission'])->name('profil.permissions.grant');
-
-
-// Gestion des profils (Ressource standard)
-Route::resource('profil', RoleController::class);
-
-// Gestion spécifique des permissions
-// 1. Liste des permissions d'un rôle
-Route::get('profil/permission/{id}', [RoleController::class, 'permissions'])->name('profil.permissions');
-
-// 2. Formulaire pour cocher les permissions
-Route::get('profil/permission/add/{id}', [RoleController::class, 'addPermission'])->name('profil.permissions.add');
-
-// 3. Traitement de l'enregistrement (POST ou PUT)
-Route::post('profil/grantPermission/{id}', [RoleController::class, 'grantPermission'])->name('profil.permissions.grant');
+Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');

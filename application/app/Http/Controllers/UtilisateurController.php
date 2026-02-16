@@ -4,58 +4,34 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\{Hash, Auth, DB, Log};
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
-use Spatie\Permission\PermissionRegistrar;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class UtilisateurController extends Controller
 {
-    /**
-     * Constructeur : ajoute des middlewares pour l'authentification et le rôle IT.
-     */
-    public function __construct()
+  
+
+    public function index(): View
     {
-       // $this->middleware('auth');
-       // $this->middleware('role:IT');
-    }
-
-    /**
-     * Affiche la liste des utilisateurs.
-     */
-    public function index()
-    {
-
-
-
         return view('configuration.users.liste', ['titre' => 'Liste des utilisateurs']);
-
     }
 
-    /**
-     * Affiche le formulaire de création d’un utilisateur.
-     */
-    public function create()
+    public function create(): View
     {
-        $roles = Role::all();
-
-        return view('users.create', [
-            'title' => 'Créer un Utilisateur',
-            'roles' => $roles,
+        return view('configuration.users.create', [
+            'titre' => 'Créer un Utilisateur',
+            'roles' => Role::all(),
         ]);
     }
 
-    /**
-     * Enregistre un nouvel utilisateur.
-     */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'work_email' => 'required|work_email|unique:users,work_email|max:255',
+            'work_email' => 'required|email|unique:users,work_email|max:255',
             'password_first_connection' => 'required|string|min:8',
             'role_id' => 'required|exists:roles,id',
         ]);
@@ -63,8 +39,8 @@ class UtilisateurController extends Controller
         $user = User::create([
             'name' => $request->name,
             'work_email' => $request->work_email,
-            'password' => Hash::make('temporary'), // Mot de passe temporaire
-            'password_first_connection' => true,  // Flag pour la première connexion
+            'password' => Hash::make($request->password_first_connection),
+            'password_first_connection' => true,
         ]);
 
         $user->assignRole($request->role_id);
@@ -72,237 +48,150 @@ class UtilisateurController extends Controller
         return redirect()->route('users.index')->with('success', 'Utilisateur créé avec succès.');
     }
 
-    /**
-     * Affiche les détails d’un utilisateur spécifique.
-     */
-    public function show($id)
+    public function edit(int $id): View
     {
         $user = User::findOrFail($id);
-
-        return view('users.show', [
-            'title' => 'Détails de l’Utilisateur',
+        return view('configuration.users.edit', [
+            'titre' => 'Modifier Utilisateur',
             'user' => $user,
+            'roles' => Role::all(),
         ]);
     }
 
-    /**
-     * Affiche le formulaire d’édition d’un utilisateur.
-     */
-    public function edit($id)
-    {
-        $user = User::findOrFail($id);
-        $roles = Role::all();
-
-        return view('users.edit', [
-            'title' => 'Modifier Utilisateur',
-            'user' => $user,
-            'roles' => $roles,
-        ]);
-    }
-
-    /**
-     * Met à jour les informations d’un utilisateur.
-     */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): RedirectResponse
     {
         $user = User::findOrFail($id);
 
         $request->validate([
             'name' => 'required|string|max:255',
             'work_email' => 'required|email|unique:users,work_email,' . $id,
-            'password_first_connection' => 'nullable|string|min:8',
             'role_id' => 'required|exists:roles,id',
         ]);
 
         $user->name = $request->name;
         $user->work_email = $request->work_email;
 
-        if ($request->filled('password_first_connection')) {
-            $user->password_first_connection = Hash::make($request->password_first_connection);
-            $user->password = Hash::make($request->password_first_connection);
-
+        if ($request->filled('password_new')) {
+            $user->password = Hash::make($request->password_new);
+            $user->password_first_connection = true; // On force le reset au prochain login
         }
 
         $user->save();
-        $user->syncRoles([$request->role_id]);
+        $role = Role::findById($request->role_id, 'web');
+        $user->syncRoles($role);
 
-        return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour avec succès.');
+        return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour.');
     }
 
-    /**
-     * Supprime un utilisateur.
-     */
-    public function destroy($id)
-    {
-        $user = User::findOrFail($id);
-        $user->delete();
+    public function destroy(int $id): RedirectResponse
+{
+    $user = User::findOrFail($id);
 
-        return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès.');
+    if ($user->id === Auth::id()) {
+        return redirect()->back()->with('error', "Vous ne pouvez pas supprimer votre propre compte.");
     }
 
-    /**
-     * Affiche le formulaire pour changer le mot de passe à la première connexion.
-     */
-    public function showChangePasswordForm()
+    // 1. Supprimer les dépendances d'abord
+    \App\Models\Planning::where('user_id', $user->id)->delete();
+    
+    // Si tu as une liaison dans la table agents, fais de même :
+    // \App\Models\Agent::where('work_email', $user->work_email)->delete();
+
+    // 2. Supprimer l'utilisateur
+    $user->delete();
+
+    return redirect()->route('users.index')->with('success', 'Utilisateur et ses données associés ont été supprimés.');
+}
+
+    // --- Gestion du premier Mot de passe ---
+
+    public function showChangePasswordForm(): View
     {
         return view('auth.change-password');
     }
 
-    /**
-     * Met à jour le mot de passe de l'utilisateur lors de la première connexion.
-     */
-    public function updatePassword(Request $request)
+    public function updatePassword(Request $request): RedirectResponse
     {
-
-
-        // Validation des données
         $request->validate([
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        // Récupérer l'utilisateur authentifié
-        $user = User::find(Auth::user()->id);
+        /** @var User $user */
+        $user = Auth::user();
 
-    //
-
-        // Vérifier que c'est la première connexion
         if (!$user->password_first_connection) {
-            return redirect()->route('home')->with('error', 'Vous ne pouvez pas changer votre mot de passe à ce moment.');
+            return redirect()->route('home');
         }
 
-
-        // Mettre à jour le mot de passe
-        $user->password = Hash::make($request->password);
-        $user->password_first_connection = null;  // Indiquer que le mot de passe a été changé
-        $user->save();
-
-        // Rediriger l'utilisateur vers la page d'accueil
-        return redirect()->route('home')->with('success', 'Votre mot de passe a été modifié avec succès !');
-    }
-
-    /**
-     * Gère les permissions d’un rôle.
-     */
-    public function permissions($id)
-    {
-
-
-        $role = Role::findById($id)->load('permissions');
-
-        return view('configuration.role.listePermission', [
-            'titre' => "Liste des Permissions du Profil " . $role->guard_name,
-            'permissions' => $role->permissions,
-            'role' => $role,
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_first_connection' => false
         ]);
-    }
 
-    /**
-     * Ajoute des permissions à un rôle.
-     */
-    public function addPermission($id)
-    {
-        $role = Role::findById($id, 'web');
-        $permissions = Permission::all();
-
-        foreach ($permissions as $permission) {
-            $permission->Checked = $role->hasPermissionTo($permission->name) ? 'checked' : '';
-        }
-
-        return view('configuration.role.ajouterPermission', [
-            'titre' => "Ajouter Permissions du Profil " . $role->guard_name,
-            'role' => $role,
-            'permissions' => $permissions,
-        ]);
-    }
-
-    /**
-     * Attribue ou révoque des permissions à un rôle.
-     */
-    public function grantPermission(Request $request, $id)
-    {
-        $role = Role::findById($id);
-        $permissions = Permission::all();
-
-        foreach ($permissions as $permission) {
-            $role->revokePermissionTo($permission->name);
-            if ($request->has('role_' . $permission->id)) {
-                $role->givePermissionTo($permission->name);
-            }
-        }
-
-        return redirect()->route('roles.permissions', ['id' => $id])->with('success', 'Permissions mises à jour avec succès.');
-    }
-
-    /**
-     * Révoque une permission spécifique d’un rôle.
-     */
-    public function revoquer($idRole, $idPermission)
-    {
-        $role = Role::findById($idRole);
-        $permission = Permission::findById($idPermission);
-
-        if ($role->hasPermissionTo($permission->name)) {
-            $role->revokePermissionTo($permission->name);
-        }
-
-        return redirect()->back();
+        return redirect()->route('home')->with('success', 'Mot de passe mis à jour !');
     }
 
     public function ajax()
 {
-    $query = DB::table('users')
-        ->join('agents', 'agents.work_email', '=', 'users.work_email')
-        ->join('projets', 'agents.projet_id', '=', 'projets.id')
-        ->join('sites', 'projets.site_id', '=', 'sites.id')
-        ->leftJoin('model_has_roles', function ($join) {
-            $join->on('model_has_roles.model_id', '=', 'users.id')
-                 ->where('model_has_roles.model_type', '=', User::class);
-        })
-        ->leftJoin('roles', 'roles.id', '=', 'model_has_roles.role_id')
-        ->select([
-            'users.id as user_id', // Alias pour l'affichage
-            'users.name',
-            'users.work_email',
-            'agents.fonction as fonction',
-            'roles.name as role',
-            'projets.designation as projet',
-            'sites.designation as site',
-        ]);
+    // 1. On utilise Eloquent pour charger proprement les relations N-N
+    // User -> Agent -> Projets -> Site
+    $query = User::with(['agent.projets.site', 'roles']);
 
     return DataTables::of($query)
-        // Correction pour le filtrage de l'ID
-        ->filterColumn('user_id', function($query, $keyword) {
-            $query->where('users.id', 'like', "%{$keyword}%");
+        // Correction de la colonne SITE (Unique pour tous les projets rattachés)
+        ->addColumn('site_nom', function ($user) {
+            if (!$user->agent || $user->agent->projets->isEmpty()) return '-';
+            return $user->agent->projets->map(function($p) {
+                return $p->site->designation ?? '-';
+            })->unique()->implode(', ');
         })
-        // Correction pour le filtrage des colonnes avec alias/jointures
-        ->filterColumn('role', function($query, $keyword) {
-            $query->where('roles.name', 'like', "%{$keyword}%");
-        })
-        ->filterColumn('projet', function($query, $keyword) {
-            $query->where('projets.designation', 'like', "%{$keyword}%");
-        })
-        ->filterColumn('site', function($query, $keyword) {
-            $query->where('sites.designation', 'like', "%{$keyword}%");
-        })
-        ->addColumn('action', function ($row) {
-            $editUrl = route('users.edit', $row->user_id);
-            $deleteUrl = route('users.destroy', $row->user_id);
-            $csrf = csrf_token();
 
-            return <<<HTML
-                <a href="{$editUrl}" class="btn btn-sm btn-primary me-1" title="Modifier">
-                    <i class="fa fa-edit"></i>
-                </a>
-                <form action="{$deleteUrl}" method="POST" style="display:inline;" onsubmit="return confirm('Confirmer la suppression ?')">
-                    <input type="hidden" name="_token" value="{$csrf}">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Supprimer">
-                        <i class="fa fa-trash"></i>
-                    </button>
-                </form>
-            HTML;
+        // Correction de la colonne PROJET (Affiche tous les projets rattachés)
+        ->addColumn('projet_nom', function ($user) {
+            if (!$user->agent || $user->agent->projets->isEmpty()) {
+                return '<span class="text-muted small">Aucun projet</span>';
+            }
+            return $user->agent->projets->map(function($p) {
+                return '<span class="badge bg-info text-dark" style="font-size: 0.7rem; margin-right: 2px;">' 
+                    . e($p->designation) . '</span>';
+            })->implode('');
         })
-        ->rawColumns(['action'])
+
+        // Colonne FONCTION
+        ->addColumn('fonction', function ($user) {
+            return $user->agent->fonction ?? '-';
+        })
+
+        // Colonne RÔLE (Spatie)
+        ->addColumn('role_name', function ($user) {
+            return $user->roles->pluck('name')->map(function($role) {
+                return '<span class="badge bg-secondary">' . e($role) . '</span>';
+            })->implode(' ');
+        })
+
+        // Filtrage de la recherche pour les projets (indispensable en Many-to-Many)
+        ->filterColumn('projet_nom', function($q, $kw) {
+            $q->whereHas('agent.projets', function($sub) use ($kw) {
+                $sub->where('designation', 'like', "%$kw%");
+            });
+        })
+
+        // Boutons d'action
+        ->addColumn('action', function ($user) {
+            $editUrl = route('users.edit', $user->id);
+            $deleteUrl = route('users.destroy', $user->id);
+            $csrf = csrf_token();
+            return '
+                <div class="btn-group shadow-sm">
+                    <a href="'.$editUrl.'" class="btn btn-sm btn-outline-primary"><i class="fa fa-edit"></i></a>
+                    <form action="'.$deleteUrl.'" method="POST" style="display:inline" onsubmit="return confirm(\'Confirmer la suppression ?\')">
+                        <input type="hidden" name="_token" value="'.$csrf.'">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></button>
+                    </form>
+                </div>';
+        })
+        ->rawColumns(['projet_nom', 'role_name', 'action'])
         ->make(true);
 }
 }

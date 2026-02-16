@@ -3,113 +3,80 @@
 namespace App\Http\Controllers;
 
 use App\Models\Site;
-use App\Imports\SitesImport;
 use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
+use Illuminate\Support\Facades\Log;
 
 class SiteController extends Controller
 {
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('role:Ressources Humaines');
+        // Extension du rôle à IT pour la maintenance
+        $this->middleware('role:Ressources Humaines|IT');
     }
 
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
+    public function index(): View
     {
         $sites = Site::all();
-        return view('configuration.site.liste', ['titre' => "Liste des Sites", 'sites' => $sites]);
+        return view('configuration.site.liste', [
+            'titre' => "Liste des Sites", 
+            'sites' => $sites
+        ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
+    public function create(): View
     {
         return view('configuration.site.create', ['titre' => "Ajouter un Site"]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        Site::create(
-            [
-                'designation' => $request->input('designation'),
-                'responsable' => $request->input('responsable'),
-                'contact' => $request->input('contact')
-            ]
-        );
+        $request->validate([
+            'designation' => 'required|string|max:255|unique:sites,designation',
+            'responsable' => 'nullable|string|max:255',
+            'contact'     => 'nullable|string'
+        ]);
 
-        return redirect()->route('site.index')->with('success','Site ajouté avec succès.');
+        Site::create($request->only('designation', 'responsable', 'contact'));
+
+        return redirect()->route('site.index')->with('success', 'Site ajouté avec succès.');
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Site  $site
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Site $site)
+    public function edit(Site $site): View
     {
-        //
+        return view('configuration.site.edit', [
+            'titre' => "Modifier " . $site->designation, 
+            'site' => $site
+        ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Site  $site
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Site $site)
+    public function update(Request $request, Site $site): RedirectResponse
     {
-        return view('configuration.site.edit', ['titre' => "Modifier ".$site->designation, 'site' => $site]);
-    }
+        $request->validate([
+            'designation' => 'required|string|max:255|unique:sites,designation,' . $site->id,
+            'responsable' => 'nullable|string|max:255',
+            'contact'     => 'nullable|string'
+        ]);
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Site  $site
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, Site $site)
-    {
-        $site->designation = $request->input('designation');
-        $site->responsable = $request->input('responsable');
-        $site->contact = $request->input('contact');
-
-        try{
-            $site->save();
-        }catch (\Exception $e){
-            echo'e';
+        try {
+            $site->update($request->only('designation', 'responsable', 'contact'));
+            return redirect()->route('site.index')->with('success', 'Site modifié avec succès.');
+        } catch (\Exception $e) {
+            Log::error("Erreur update site: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Erreur lors de la modification.');
         }
-        return redirect()->route('site.index')->with('success','Site modifié avec succès.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Site  $site
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy(Site $site)
+    public function destroy(Site $site): RedirectResponse
     {
+        // Sécurité critique : On vérifie si des projets sont rattachés au site
+        if ($site->projets()->count() > 0) {
+            return redirect()->back()->with('error', 'Impossible de supprimer : ce site contient encore des projets actifs.');
+        }
+
         $site->delete();
-
-        return redirect()->route('site.index')
-            ->with('success', 'Site Supprimé avec succes');
+        return redirect()->route('site.index')->with('success', 'Site supprimé avec succès.');
     }
-
 }

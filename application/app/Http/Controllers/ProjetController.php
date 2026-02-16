@@ -9,179 +9,118 @@ use App\Imports\ProjetsImport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
-
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class ProjetController extends Controller
 {
-    private $templatePath = 'configuration.projet';
-    private $link = 'projet';
+    private string $templatePath = 'configuration.projet';
+    private string $link = 'projet';
 
-    public function __construct()
+  
+    public function index(): View
     {
-        $this->middleware('auth');
-        $this->middleware('role:Ressources Humaines|IT');
-    }
-
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
-    {
-
         return view('configuration.projet.liste', ['titre' => 'Liste des Projets/Services']);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
+    public function create(): View
     {
         $foreigns = Site::all();
-        return view($this->templatePath.'.create', ['titre' => "Ajouter un Projet/Service", 'link' => $this->link, 'foreigns' => $foreigns]);
+        return view($this->templatePath.'.create', [
+            'titre' => "Ajouter un Projet/Service", 
+            'link' => $this->link, 
+            'foreigns' => $foreigns
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        Projet::create(
-            [
-                'designation' => $request->input('designation'),
-                'site_id' => $request->input('site_id'),
-                'dltsuperviseur' => $request->input('dltsuperviseur')
-            ]
-        );
-
-        return redirect()->route('projet.index');
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Projet  $projet
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Projet $projet)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Projet  $projet
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Projet $projet)
-    {
-        $item = $projet;
-        $foreigns = Site::all();
-
-        return view($this->templatePath.'.edit', ['titre' => "Modifier Projet".$item->designation, 'item' => $item, 'link' => $this->link, 'foreigns' => $foreigns]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Projet  $projet
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-    {
-        $item = Projet::find($id);
-
-        $item->designation = $request->input('designation');
-        $item->site_id = $request->input('site_id');
-        $item->dltsuperviseur = $request->input('dltsuperviseur');
-
-
-        try{
-            $item->save();
-        }catch (\Exception $e){
-            echo'e';
-        }
-        return redirect()->route('projet.index');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Projet  $projet
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id)
-    {
-        $item = Projet::find($id);
-
-        $item->delete();
-
-        return redirect()->route('projet.index')
-            ->with('success', "Projet Supprimé avec succes");
-    }
-
-    public function import (Request $req){
-
-        Excel::import(new ProjetsImport, $req->file('projet_file'),
-
-     );
-
-         return back();
-     }
-
-
-    public function ajax()
-{
-    // Construction de la requête avec jointure pour obtenir le nom du site
-    $query = DB::table('projets')
-        ->join('sites', 'projets.site_id', '=', 'sites.id')
-        ->select([
-            'projets.id as projet_id',      // Utilisé pour les routes edit/destroy
-            'projets.msa_id',
-            'projets.designation',
-            'sites.designation as site_nom',        // On récupère le NOM du site pour l'affichage
-            'projets.dltsuperviseur',
+        $request->validate([
+            'designation' => 'required|string|max:255',
+            'site_id' => 'required|exists:sites,id'
         ]);
 
-    return DataTables::of($query)
-        // Correction de l'erreur SQL : On lie l'alias 'site_nom' à la colonne physique 'sites.nom'
-        ->filterColumn('site_nom', function($query, $keyword) {
-            $query->where('sites.designation', 'like', "%{$keyword}%");
-        })
-        // Correction pour MSA ID (évite les conflits de noms de colonnes)
-        ->filterColumn('msa_id', function($query, $keyword) {
-            $query->where('projets.msa_id', 'like', "%{$keyword}%");
-        })
-        ->addColumn('action', function ($row) {
-            $edit = route('projet.edit', $row->projet_id);
-            $delete = route('projet.destroy', $row->projet_id);
-            $token = csrf_token();
+        Projet::create($request->only('designation', 'site_id', 'dltsuperviseur'));
 
-            return <<<HTML
-                <div class="btn-group">
-                    <a href="{$edit}" class="btn btn-sm btn-primary" title="Modifier">
-                        <i class="fa fa-edit"></i>
-                    </a>
-                    <form action="{$delete}" method="POST" style="display:inline-block;" onsubmit="return confirm('Supprimer ce projet ?')">
-                        <input type="hidden" name="_token" value="{$token}">
-                        <input type="hidden" name="_method" value="DELETE">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Supprimer">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </form>
-                </div>
+        return redirect()->route('projet.index')->with('success', 'Projet créé avec succès.');
+    }
+
+    public function edit(Projet $projet): View
+    {
+        $foreigns = Site::all();
+        return view($this->templatePath.'.edit', [
+            'titre' => "Modifier Projet : " . $projet->designation, 
+            'item' => $projet, 
+            'link' => $this->link, 
+            'foreigns' => $foreigns
+        ]);
+    }
+
+    public function update(Request $request, $id): RedirectResponse
+    {
+        $item = Projet::findOrFail($id);
+
+        try {
+            $item->update($request->only('designation', 'site_id', 'dltsuperviseur'));
+            return redirect()->route('projet.index')->with('success', 'Projet mis à jour.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Erreur : ' . $e->getMessage());
+        }
+    }
+
+    public function destroy($id): RedirectResponse
+    {
+        $item = Projet::findOrFail($id);
+        
+        // Sécurité : On vérifie si des agents sont liés au projet avant de supprimer
+        if ($item->agents()->count() > 0) {
+            return redirect()->back()->with('error', 'Impossible de supprimer : des agents sont liés à ce projet.');
+        }
+
+        $item->delete();
+        return redirect()->route('projet.index')->with('success', "Projet supprimé avec succès.");
+    }
+
+    public function import(Request $req): RedirectResponse
+    {
+        $req->validate(['projet_file' => 'required|mimes:xlsx,xls,csv']);
+        Excel::import(new ProjetsImport, $req->file('projet_file'));
+        return back()->with('success', 'Importation réussie.');
+    }
+
+    public function ajax()
+    {
+        $query = DB::table('projets')
+            ->join('sites', 'projets.site_id', '=', 'sites.id')
+            ->select([
+                'projets.id as projet_id',
+                'projets.msa_id',
+                'projets.designation',
+                'sites.designation as site_nom',
+                'projets.dltsuperviseur',
+            ]);
+
+        return DataTables::of($query)
+            ->filterColumn('site_nom', function($query, $keyword) {
+                $query->where('sites.designation', 'like', "%{$keyword}%");
+            })
+            ->addColumn('action', function ($row) {
+                $edit = route('projet.edit', $row->projet_id);
+                $delete = route('projet.destroy', $row->projet_id);
+                $token = csrf_token();
+
+                return <<<HTML
+                    <div class="btn-group">
+                        <a href="{$edit}" class="btn btn-sm btn-primary"><i class="fa fa-edit"></i></a>
+                        <form action="{$delete}" method="POST" style="display:inline-block;" onsubmit="return confirm('Supprimer ce projet ?')">
+                            <input type="hidden" name="_token" value="{$token}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
+                        </form>
+                    </div>
 HTML;
-        })
-        ->rawColumns(['action'])
-        ->make(true);
-}
-
+            })
+            ->rawColumns(['action'])
+            ->make(true);
+    }
 }

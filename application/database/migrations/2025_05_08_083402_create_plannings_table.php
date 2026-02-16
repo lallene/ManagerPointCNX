@@ -13,26 +13,16 @@ class CreatePlanningsTable extends Migration
      */
     public function up()
     {
-        Schema::create('plannings', function (Blueprint $table) {
+       Schema::create('plannings', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
-            $table->date('jour');
+            $table->date('jour')->index();
             $table->time('entree');
             $table->time('sortie');
-            $table->string('semaine');
-            $table->unsignedBigInteger('agent_id')->nullable();
-            $table->foreign('agent_id')
-                ->references('id')
-                ->on('agents')
-                ->onDelete('cascade')
-                ->onUpdate('cascade');
+            $table->integer('semaine')->index(); // Indexé pour les filtres de Dashboard
             
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->foreign('user_id')
-                ->references('id')
-                ->on('users')
-                ->onDelete('cascade')
-                ->onUpdate('cascade');    
+            $table->foreignId('agent_id')->constrained('agents')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users'); // Qui a créé le planning
+            $table->timestamps();
         });
     }
 

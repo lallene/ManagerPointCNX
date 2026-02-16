@@ -14,17 +14,11 @@ class CreateProjetsTable extends Migration
     public function up()
     {
         Schema::create('projets', function (Blueprint $table) {
-            $table->engine = 'InnoDB';
             $table->id();
-            $table->text('designation')->nullable();
-            $table->string('dltsuperviseur');
-            $table->unsignedBigInteger('site_id')->nullable();
-            $table->string('msa_id')->nullable();
-            $table->foreign('site_id')
-                ->references('id')
-                ->on('sites')
-                ->onDelete('cascade')
-                ->onUpdate('cascade');
+            $table->string('designation');
+            $table->string('msa_id')->nullable()->index();
+            $table->string('dltsuperviseur')->nullable();
+            $table->foreignId('site_id')->constrained('sites')->onDelete('cascade');
         });
     }
 

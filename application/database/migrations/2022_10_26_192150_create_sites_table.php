@@ -13,10 +13,9 @@ class CreateSitesTable extends Migration
      */
     public function up()
     {
-        Schema::create('sites', function (Blueprint $table) {
-            $table->engine = 'InnoDB';
+       Schema::create('sites', function (Blueprint $table) {
             $table->id();
-            $table->string('designation');
+            $table->string('designation')->unique();
             $table->string('responsable')->nullable();
             $table->string('contact')->nullable();
         });

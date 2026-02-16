@@ -14,23 +14,16 @@
         public function up()
         {
             Schema::create('agents', function (Blueprint $table) {
-            $table->id(); 
-            $table->string('workday_id')->unique(); 
-            $table->string('prenom');
-            $table->string('nom');
-            $table->string('work_email')->unique();
-            $table->string('fonction');
-            
-            $table->string('manager')->nullable()->index(); 
-            
-            $table->foreignId('projet_id')
-                ->nullable()
-                ->constrained('projets')
-                ->onDelete('cascade')
-                ->onUpdate('cascade');
+                $table->id();
+                $table->string('workday_id')->unique()->index(); 
+                $table->string('nom');
+                $table->string('prenom');
+                $table->string('work_email')->unique()->index(); 
+                $table->string('fonction')->nullable();
+                $table->string('manager')->nullable(); 
+                $table->foreignId('projet_id')->constrained('projets')->onDelete('cascade');
 
-            $table->timestamps(); 
-        });
+            });
         }
 
         /**

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <title>Connexion - ManagerPointCNX</title>
@@ -26,7 +27,8 @@
             width: 100%;
             height: 100%;
             backdrop-filter: blur(2px);
-            background-color: rgba(245, 247, 250, 0.63); /* couche blanche transparente */
+            background-color: rgba(245, 247, 250, 0.63);
+            /* couche blanche transparente */
             z-index: 0;
         }
 
@@ -80,6 +82,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="overlay"></div>
 
@@ -98,9 +101,8 @@
 
             <div class="mb-3">
                 <label for="work_email" class="form-label">Adresse e-mail</label>
-                <input id="work_email" type="email" 
-                       class="form-control @error('work_email') is-invalid @enderror" 
-                       name="work_email" value="{{ old('work_email') }}" required autofocus>
+                <input id="work_email" type="email" class="form-control @error('work_email') is-invalid @enderror"
+                    name="work_email" value="{{ old('work_email') }}" required autofocus>
                 @error('work_email')
                     <span class="text-danger small">{{ $message }}</span>
                 @enderror
@@ -108,9 +110,8 @@
 
             <div class="mb-3">
                 <label for="password" class="form-label">Mot de passe</label>
-                <input id="password" type="password" 
-                       class="form-control @error('password') is-invalid @enderror" 
-                       name="password" required>
+                <input id="password" type="password" class="form-control @error('password') is-invalid @enderror"
+                    name="password" required>
                 @error('password')
                     <span class="text-danger small">{{ $message }}</span>
                 @enderror
@@ -118,10 +119,11 @@
 
             <div class="mb-3 d-flex justify-content-between align-items-center">
                 <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
+                    <input class="form-check-input" type="checkbox" name="remember" id="remember"
+                        {{ old('remember') ? 'checked' : '' }}>
                     <label class="form-check-label" for="remember">Se souvenir de moi</label>
                 </div>
-                <a class="small text-link" href="{{ route('password.request') }}">Mot de passe oublié ?</a>
+                <a class="small text-link" href="#">Mot de passe oublié ?</a>
             </div>
 
             <button type="submit" class="btn btn-primary w-100">Connexion</button>
@@ -131,4 +133,5 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>
