@@ -8,7 +8,7 @@
         <div class="card-header">Informations de l'utilisateur</div>
         <div class="card-body">
             <p><strong>Nom :</strong> {{ $user->name }}</p>
-            <p><strong>Email :</strong> {{ $user->email }}</p>
+            <p><strong>Email :</strong> {{ $user->work_email }}</p>
             <p><strong>Rôles :</strong>
                 @foreach ($user->roles as $role)
                     {{ $role->name }}<br>

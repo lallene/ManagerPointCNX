@@ -63,7 +63,7 @@ class AgentsImport implements ToModel, WithChunkReading, WithHeadingRow, SkipsOn
                     'projet_id' => $row['projet'],
                     'nom' => $row['nom'],
                     'prenom' => $row['prenom'],
-                    'email' => $row['work_email'] ?? null,
+                    'work_email' => $row['work_email'] ?? null,
                     'fonction' => $row['business_title'] ?? null,
                     'manager' => $row['manager_level_01_employee_id'] ?? null,
                 ]);
@@ -78,10 +78,10 @@ class AgentsImport implements ToModel, WithChunkReading, WithHeadingRow, SkipsOn
             }
 
             // Créer le User si non existant
-            if (!empty($row['work_email']) && !\App\Models\User::where('email', $row['work_email'])->exists()) {
+            if (!empty($row['work_email']) && !\App\Models\User::where('work_email', $row['work_email'])->exists()) {
                 $user = \App\Models\User::create([
                     'name' => $row['prenom'] . ' ' . $row['nom'],
-                    'email' => $row['work_email'],
+                    'work_email' => $row['work_email'],
                     'password' => \Hash::make($row['matricule_du_salarie']),
                     'password_first_connection' => true,
                 ]);
@@ -91,7 +91,7 @@ class AgentsImport implements ToModel, WithChunkReading, WithHeadingRow, SkipsOn
                 if (isset($roleMapping[$jobCode])) {
                     $user->assignRole($roleMapping[$jobCode]);
                     Log::info('User created with role:', [
-                        'email' => $user->email,
+                        'work_email' => $user->work_email,
                         'role_id' => $roleMapping[$jobCode],
                     ]);
                 }

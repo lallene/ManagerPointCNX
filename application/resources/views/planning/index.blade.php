@@ -1,372 +1,310 @@
 @extends('layouts.app')
 
 @section('content')
-<meta charset="UTF-8">
-<meta http-equiv="Content-Language" content="fr">
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Language" content="fr">
 
-<style>
-    @media (min-width: 1400px) {
-        .container, .container-lg, .container-md, .container-sm, .container-xl, .container-xxl {
-            max-width: 1492px !important;
+    <style>
+        @media (min-width: 1400px) {
+            .container-fluid {
+                max-width: 1600px;
+            }
         }
-    }
 
-    /* Style global tableau */
-    .table {
-        border-collapse: separate !important;
-        border-spacing: 0 8px; /* espace vertical entre lignes */
-    }
+        /* Design du Tableau */
+        #agentTable {
+            border-collapse: separate !important;
+            border-spacing: 0 5px;
+        }
 
-    /* En-tête tableau */
-    .table thead th {
-        background-color: #cfe2ff; /* bleu clair bootstrap */
-        color: #084298; /* bleu foncé */
-        font-weight: 700;
-        vertical-align: middle;
-        text-align: center;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
-        padding: 12px 10px;
-        user-select: none;
-    }
+        #agentTable thead th {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            font-weight: 700;
+            text-align: center;
+            padding: 12px 8px;
+            border: none;
+        }
 
-    /* Colonnes Agent */
-    tbody td:first-child {
-        font-weight: 600;
-        color: #0d6efd;
-        min-width: 160px;
-        vertical-align: middle;
-    }
+        #agentTable tbody td {
+            background-color: #ffffff;
+            vertical-align: middle;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            transition: all 0.2s;
+        }
 
-    /* Cellules planning */
-    tbody td {
-        background-color: #f8f9fa;
-        vertical-align: middle;
-        min-width: 140px;
-        padding: 8px 6px;
-        transition: background-color 0.3s ease;
-        border-radius: 6px;
-    }
+        #agentTable tbody tr:hover td {
+            background-color: #f1f8ff;
+        }
 
-    /* Hover sur lignes */
-    tbody tr:hover td {
-        background-color: #e7f1ff;
-        cursor: default;
-    }
+        /* Style des Inputs Time */
+        .heure-input {
+            width: 82px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.85rem;
+            padding: 2px;
+        }
 
-    /* Badge planning */
-    .badge.bg-success {
-        background-color: #198754 !important;
-        color: white;
-        font-weight: 600;
-        font-size: 0.9rem;
-        padding: 6px 12px;
-        border-radius: 12px;
-        display: inline-block;
-        box-shadow: 0 2px 6px rgb(25 135 84 / 0.4);
-        user-select: none;
-    }
+        .text-success.small:hover {
+            text-decoration: underline !important;
+            color: #157347 !important;
+        }
 
-    /* Texte cellule vide */
-    .text-muted {
-        font-style: italic;
-        font-size: 1.1rem;
-        color: #adb5bd !important;
-        user-select: none;
-    }
+        .heure-input:focus {
+            border-color: #0d6efd;
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+        }
 
-    /* Boutons sélection semaine */
-    .btn-sm {
-        min-width: 75px;
-        padding: 8px 10px;
-        font-weight: 700;
-        font-size: 0.9rem;
-        user-select: none;
-        border-radius: 6px;
-        transition: background-color 0.25s ease;
-    }
-    .btn-sm:hover {
-        filter: brightness(0.9);
-    }
+        /* Badges et Semaines */
+        .date-badge {
+            font-size: 0.7rem;
+            display: block;
+            color: #6c757d;
+            font-weight: 400;
+        }
 
-    /* Titre principal */
-    .styled-title {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 2.5rem;
-        color: #0d6efd;
-        font-weight: 700;
-        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.15);
-        letter-spacing: 1px;
-        user-select: none;
-        margin-top: 60px;
-        margin-bottom: 0px;
-        text-align: center;
-    }
-     .styled-title {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 2.5rem;
-        color: #0d6efd;
-        font-weight: 700;
-        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.15);
-        letter-spacing: 1px;
-        user-select: none;
-        margin-top: 70px;
-        margin-bottom: 40px;
-        text-align: center;
-    }
-</style>
+        .btn-week {
+            min-width: 100px;
+            margin: 4px;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="column_title">
-                <h2>🗓️ Planification Hebdomadaire</h2>
-                <div class="breadcrumb-custom d-none d-md-block">
-                    <span>ManagerPoint</span> / <span>Planification Hebdomadaire</span>
+        .filter-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+
+    <div class="container-fluid py-4">
+
+        {{-- Header : Titre et Infos --}}
+        <div class="row">
+            <div class="col-md-12">
+                <div class="column_title">
+                    <h2>🗓️ Planification Hebdomadaire</h2>
+                    <div class="breadcrumb-custom d-none d-md-block">
+                        <span>ManagerPoint</span> / <span>Projet :
+                            <strong>{{ $agents->first()->nom_projet ?? 'N/A' }}</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    {{-- Grille de semaines --}}
-    <div class="d-flex flex-wrap justify-content-center mb-4">
-        @foreach ($semaines as $semaine)
-            <form method="GET" action="{{ route('planification') }}" class="me-2 mb-2">
-                <input type="hidden" name="week" value="{{ $semaine['numero'] }}">
-                <button type="submit" class="btn btn-sm {{ $selectedWeek == $semaine['numero'] ? 'btn-primary' : 'btn-outline-info' }} fw-bold shadow-sm">
-                    S{{ $semaine['numero'] }}<br>
-                    <small>{{ $semaine['debut'] }} - {{ $semaine['fin'] }}</small>
-                </button>
-            </form>
-        @endforeach
-    </div>
-    <div class="row g-3 align-items-stretch mb-4">
-
-    <!-- Formulaire d'import -->
-    <div class="col-md-4 d-flex">
-        <form action="{{ route('plannings.import') }}" method="POST" enctype="multipart/form-data"
-              class="p-3 border rounded bg-light w-100 d-flex flex-column justify-content-between">
-            @csrf
-
-            <div>
-                <label for="file" class="form-label" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.25rem; font-weight: 600;">  📄 Importer un fichier Excel :</label>
-                <input type="file" name="file" id="file" class="form-control mb-2" required>
-                <input type="hidden" name="week" value="{{ $week ?? \Carbon\Carbon::now()->isoWeek() }}">
-            </div>
-
-            <button type="submit" class="btn btn-success mt-auto">
-                📥 Importer le planning
-            </button>
-        </form>
-    </div>
-
-    <!-- Formulaire de filtres -->
-    <div class="col-md-4 d-flex">
-        <form method="GET" action="{{ route('planification') }}"
-              class="p-3 border rounded bg-light w-100 d-flex flex-column justify-content-between">
-                    <div class="mb-3 d-flex justify-content-center align-items-center" style="gap: 2rem; font-size: 1.25rem;">
-                        <label class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" name="fonctions[]" value="Superviseur"
-                                {{ in_array('Superviseur', request('fonctions', [])) ? 'checked' : '' }}>
-                            <span class="form-check-label">Superviseur</span>
-                        </label>
-
-                        <label class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" name="fonctions[]" value="Formateur"
-                                {{ in_array('Formateur', request('fonctions', [])) ? 'checked' : '' }}>
-                            <span class="form-check-label">Formateur</span>
-                        </label>
-
-                        <label class="form-check form-check-inline mb-0">
-                            <input class="form-check-input" type="checkbox" name="fonctions[]" value="CQ"
-                                {{ in_array('CQ', request('fonctions', [])) ? 'checked' : '' }}>
-                            <span class="form-check-label">CQ</span>
-                        </label>
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded shadow-sm">
+                    <div>
+                        <h2 class="fw-bold text-primary mb-0"></h2>
+                        <p class="text-muted mb-0 small"></strong></p>
                     </div>
-
-
-
-            <button type="submit" class="btn btn-primary mt-auto">
-                🔍 Filtrer
-            </button>
-        </form>
-    </div>
-
-    <!-- Boutons d'export -->
-    <div class="col-md-4 d-flex">
-        <div class="p-3 border rounded bg-light w-100 d-flex flex-column justify-content-between">
-            <div>
-                <button id="exportPdf" class="btn btn-outline-danger w-100 mb-2">📄 Exporter PDF</button>
-                <button id="exportJpg" class="btn btn-outline-secondary w-100 mb-2">🖼️ Exporter JPG</button>
-                <button id="exportExcel" class="btn btn-outline-success w-100">📊 Exporter Excel</button>
+                    <div class="text-end">
+                        <span class="badge bg-primary fs-6 px-3 py-2">Semaine {{ $selectedWeekNum }}</span>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-</div>
+        {{-- Filtre par Catégories (Mapping) --}}
+        <div class="card filter-card mb-3">
+            <div class="card-body py-3">
+                <h6 class="fw-bold mb-3 text-secondary small text-uppercase"><i class="fas fa-filter me-2"></i>Filtrer par
+                    catégorie</h6>
+                <form method="GET" action="{{ route('planification') }}" id="filterForm"
+                    class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="hidden" name="week" value="{{ $selectedWeekNum }}">
 
+                    @foreach ($categoriesDispo as $cat)
+                        @php $isChecked = in_array($cat, (array)request('fonctions', $fonctionsChoisies)); @endphp
+                        <input type="checkbox" class="btn-check" name="fonctions[]" id="cat_{{ Str::slug($cat) }}"
+                            value="{{ $cat }}" {{ $isChecked ? 'checked' : '' }} onchange="this.form.submit()">
+                        <label class="btn btn-sm {{ $isChecked ? 'btn-primary' : 'btn-outline-primary' }} rounded-pill px-3"
+                            for="cat_{{ Str::slug($cat) }}">
+                            {{ $cat }}
+                        </label>
+                    @endforeach
 
+                    @if (request('fonctions'))
+                        <a href="{{ route('planification', ['week' => $selectedWeekNum]) }}"
+                            class="btn btn-sm btn-link text-danger ms-auto">Effacer les filtres</a>
+                    @endif
+                </form>
+            </div>
+        </div>
 
-
-
-
-    {{-- Formulaire de planning --}}
-    <form method="POST" action="{{ route('planning.store') }}">
-        @csrf
-        <input type="hidden" name="week" value="{{ $selectedWeek }}">
-
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm align-middle table-hover">
-                <thead class="table-info text-center">
-                    <tr>
-                        <th>Agent</th>
-                        @foreach (['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as $i => $jour)
-                            @php
-                                $date = \Carbon\Carbon::now()->startOfYear()->addWeeks($selectedWeek - 1)->startOfWeek()->addDays($i);
-                            @endphp
-                            <th>{{ $jour }}<br><small>{{ $date->format('d/m') }}</small></th>
-                        @endforeach
-                    </tr>
-                </thead>
-                <tbody>
-                <tbody>
-    @foreach ($agents as $agent)
-        <tr>
-            <td>{{ $agent->nom }} {{ $agent->prenom }} {{ $agent->workday_id }}</td>
-
-            @foreach (range(0, 6) as $i)
-                @php
-                    $jourDate = \Carbon\Carbon::now()->startOfYear()->addWeeks($selectedWeek - 1)->startOfWeek()->addDays($i)->format('Y-m-d');
-                    $planningKey = $agent->id . '-' . $jourDate;
-                    $planning = $plannings[$planningKey] ?? null;
-                    $datePasse = \Carbon\Carbon::parse($jourDate)->isBefore(\Carbon\Carbon::today());
-                @endphp
-
-                <td style="min-width: 140px;">
-                    <input type="hidden" name="plannings[{{ $agent->id }}][{{ $jourDate }}][jour]" value="{{ $jourDate }}">
-                    <input type="hidden" name="plannings[{{ $agent->id }}][{{ $jourDate }}][agent_id]" value="{{ $agent->id }}">
-
-                    <div class="d-flex gap-1">
-                        <input type="time"
-                               class="form-control form-control-sm heure-debut {{ $datePasse ? 'bg-light text-muted' : '' }}"
-                               name="plannings[{{ $agent->id }}][{{ $jourDate }}][heure_debut]"
-                               value="{{ $planning->heure_debut ?? '' }}"
-                               style="width: 80px;"
-                               placeholder="Début"
-                               {{ $datePasse ? 'disabled' : '' }}>
-
-                        <input type="time"
-                               class="form-control form-control-sm heure-fin {{ $datePasse ? 'bg-light text-muted' : '' }}"
-                               name="plannings[{{ $agent->id }}][{{ $jourDate }}][heure_fin]"
-                               value="{{ $planning->heure_fin ?? '' }}"
-                               style="width: 80px;"
-                               placeholder="Fin"
-                               {{ $datePasse ? 'disabled' : '' }}>
-                    </div>
-                </td>
+        {{-- Sélecteur de Semaines (avec conservation des filtres) --}}
+        <div class="d-flex flex-wrap justify-content-center mb-4">
+            @foreach ($semaines as $sem)
+                <form method="GET" action="{{ route('planification') }}">
+                    @foreach ((array) request('fonctions', $fonctionsChoisies) as $f)
+                        <input type="hidden" name="fonctions[]" value="{{ $f }}">
+                    @endforeach
+                    <input type="hidden" name="week" value="{{ $sem['numero'] }}">
+                    <button type="submit"
+                        class="btn btn-week {{ $selectedWeekNum == $sem['numero'] ? 'btn-primary shadow-sm' : 'btn-outline-secondary' }}">
+                        <span class="fw-bold">S{{ $sem['numero'] }}</span><br>
+                        <small>{{ $sem['debut'] }} - {{ $sem['fin'] }}</small>
+                    </button>
+                </form>
             @endforeach
-        </tr>
-    @endforeach
-</tbody>
-
-                </tbody>
-            </table>
         </div>
 
-        <div class="text-end mt-3">
-            <button type="submit" class="btn btn-success shadow-sm">💾 Enregistrer</button>
+        {{-- Actions Export/Import --}}
+        {{-- Actions Export/Import --}}
+        <div class="row g-3 mb-4">
+            <div class="col-md-7">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <form action="{{ route('plannings.import') }}" method="POST" enctype="multipart/form-data"
+                        class="row g-2 align-items-end">
+                        @csrf
+                        <div class="col-8">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold mb-0">IMPORTER PLANNING (EXCEL)</label>
+                                {{-- Nouveau bouton Masque --}}
+                                <a href="{{ asset('templates/masque_planning_hebdo.xlsx') }}"
+                                    class="text-success small fw-bold text-decoration-none">
+                                    <i class="fas fa-file-download"></i> Télécharger le masque
+                                </a>
+                            </div>
+                            <input type="file" name="file" class="form-control form-control-sm" required>
+                            <input type="hidden" name="week" value="{{ $selectedWeekNum }}">
+                        </div>
+                        <div class="col-4">
+                            <button type="submit" class="btn btn-success btn-sm w-100">📥 Charger</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-5 text-center">
+                <div class="card border-0 shadow-sm p-3 h-100">
+                    <label class="form-label small fw-bold mb-2">EXPORTATION</label>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button id="exportPdf" class="btn btn-outline-danger btn-sm">PDF</button>
+                        <button id="exportExcel" class="btn btn-outline-success btn-sm">Excel</button>
+                        <button id="exportJpg" class="btn btn-outline-secondary btn-sm">Image</button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </form>
-</div>
 
-{{-- Auto-calcul heure de fin --}}
-<!-- html2canvas (capture d’élément en image) -->
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<!-- jsPDF (génération de PDF) -->
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<!-- SheetJS (génération Excel) -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+        {{-- Tableau de Saisie --}}
+        <form method="POST" action="{{ route('planning.store') }}">
+            @csrf
+            <input type="hidden" name="week" value="{{ $selectedWeekNum }}">
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const heureDebuts = document.querySelectorAll('.heure-debut');
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive p-1">
+                    <table class="table align-middle" id="agentTable">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 220px;">Agent / Fonction</th>
+                                @php $joursFr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']; @endphp
+                                @foreach ($joursFr as $idx => $nom)
+                                    @php $dateHeader = \Carbon\Carbon::now()->setISODate(date('Y'), $selectedWeekNum)->startOfWeek()->addDays($idx); @endphp
+                                    <th>{{ $nom }}<span
+                                            class="date-badge">{{ $dateHeader->format('d/m') }}</span></th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($agents as $agent)
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ $agent->nom }}
+                                            {{ $agent->prenom }}</div>
+                                        <span class="badge bg-light text-primary border"
+                                            style="font-size: 0.65rem;">{{ $agent->fonction }}</span>
+                                    </td>
+                                    @foreach (range(0, 6) as $i)
+                                        @php
+                                            $currentDate = \Carbon\Carbon::now()
+                                                ->setISODate(date('Y'), $selectedWeekNum)
+                                                ->startOfWeek()
+                                                ->addDays($i)
+                                                ->format('Y-m-d');
+                                            $key = $agent->id . '-' . $currentDate;
+                                            $plan = $plannings[$key] ?? null;
+                                            $isLocked = \Carbon\Carbon::parse($currentDate)->isBefore(
+                                                \Carbon\Carbon::today(),
+                                            );
+                                        @endphp
+                                        <td>
+                                            <div class="d-flex flex-column gap-1 align-items-center">
+                                                <input type="time"
+                                                    name="plannings[{{ $agent->id }}][{{ $currentDate }}][entree]"
+                                                    class="heure-input heure-debut {{ $isLocked ? 'bg-light text-muted' : '' }}"
+                                                    value="{{ $plan->entree ?? '' }}" {{ $isLocked ? 'readonly' : '' }}>
 
-        heureDebuts.forEach(input => {
-            input.addEventListener('change', function () {
-                const debut = this.value;
-                if (!debut) return;
+                                                <input type="time"
+                                                    name="plannings[{{ $agent->id }}][{{ $currentDate }}][sortie]"
+                                                    class="heure-input heure-fin {{ $isLocked ? 'bg-light text-muted' : '' }}"
+                                                    value="{{ $plan->sortie ?? '' }}" {{ $isLocked ? 'readonly' : '' }}>
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">Aucun agent trouvé dans ces
+                                        catégories.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                const [hours, minutes] = debut.split(':').map(Number);
-                let finHours = (hours + 8) % 24;
-                const fin = `${finHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            <div class="text-end mt-4 mb-5">
+                <button type="submit" class="btn btn-primary btn-lg px-5 shadow border-0"
+                    style="background: linear-gradient(45deg, #0d6efd, #004085);">
+                    <i class="fas fa-save me-2"></i> Enregistrer le planning S{{ $selectedWeekNum }}
+                </button>
+            </div>
+        </form>
+    </div>
 
-                const container = this.closest('.d-flex');
-                const inputFin = container.querySelector('.heure-fin');
-                if (inputFin) {
-                    inputFin.value = fin;
-                }
+    {{-- Scripts d'export --}}
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-calcul + 8h lors de la saisie
+            document.querySelectorAll('.heure-debut').forEach(input => {
+                input.addEventListener('change', function() {
+                    if (!this.value) return;
+                    const [h, m] = this.value.split(':').map(Number);
+                    const fin =
+                        `${((h + 8) % 24).toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    this.closest('.d-flex').querySelector('.heure-fin').value = fin;
+                });
+            });
+
+            // Export Excel
+            document.getElementById('exportExcel').addEventListener('click', () => {
+                const wb = XLSX.utils.table_to_book(document.querySelector('#agentTable'), {
+                    sheet: "S{{ $selectedWeekNum }}"
+                });
+                XLSX.writeFile(wb, "Planning_S{{ $selectedWeekNum }}.xlsx");
+            });
+
+            // Export Image
+            document.getElementById('exportJpg').addEventListener('click', async () => {
+                const canvas = await html2canvas(document.querySelector('.table-responsive'), {
+                    scale: 2
+                });
+                const link = document.createElement('a');
+                link.download = 'Planning_S{{ $selectedWeekNum }}.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
             });
         });
-    });
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const tableContainer = document.querySelector('.table-responsive');
-
-  // PDF
-  document.getElementById('exportPdf').addEventListener('click', async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'pt', 'a4');
-    const canvas = await html2canvas(tableContainer, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
-    const imgProps = doc.getImageProperties(imgData);
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    doc.save('planning.pdf');
-  });
-
-  // JPG
-  document.getElementById('exportJpg').addEventListener('click', async () => {
-    const canvas = await html2canvas(tableContainer, { scale: 2 });
-    const imgData = canvas.toDataURL('image/jpeg', 0.9);
-    const link = document.createElement('a');
-    link.href = imgData;
-    link.download = 'planning.jpg';
-    link.click();
-  });
-
-  // Excel
-  document.getElementById('exportExcel').addEventListener('click', () => {
-  // Récupérer la table HTML
-  const table = document.querySelector('#agentTable')
-             || document.querySelector('.table-responsive table');
-
-  // 1) Générer un workbook à partir de la table
-  const wb = XLSX.utils.table_to_book(table, { sheet: 'Planning' });
-
-  // 2) Récupérer la worksheet
-  const ws = wb.Sheets['Planning'];
-
-  // 3) Parcourir toutes les adresses de cellules
-  Object.keys(ws).forEach(addr => {
-    // ignorer les métadonnées
-    if (addr[0] === '!') return;
-
-    const cell = ws[addr];
-    // si la valeur est une chaîne contenant uniquement des chiffres
-    if (typeof cell.v === 'string' && cell.v.match(/^[-+]?\d+(\.\d+)?$/)) {
-      // convertir en nombre
-      const num = parseFloat(cell.v);
-      cell.v = num;
-      cell.t = 'n'; // indique à SheetJS que c'est un nombre
-    }
-  });
-
-  // 4) Écrire et télécharger
-  XLSX.writeFile(wb, 'planning.xlsx');
-});
-
-});
-</script>
+    </script>
 
 @endsection

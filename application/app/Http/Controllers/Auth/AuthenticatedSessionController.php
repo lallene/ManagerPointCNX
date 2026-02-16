@@ -16,12 +16,12 @@ class AuthenticatedSessionController extends Controller
     {
         // Validation des informations de connexion
         $request->validate([
-            'email' => 'required|email',
+            'work_email' => 'required|work_email',
             'password' => 'required',
         ]);
 
         // Tenter la connexion
-        if (Auth::attempt($request->only('email', 'password'))) {
+        if (Auth::attempt($request->only('work_email', 'password'))) {
             $user = Auth::user();
 
             // Si c'est la première connexion de l'utilisateur
@@ -36,7 +36,7 @@ class AuthenticatedSessionController extends Controller
 
         // Si la connexion échoue, retourner avec un message d'erreur
         return back()->withErrors([
-            'email' => 'Les informations d\'identification fournies sont incorrectes.',
+            'work_email' => 'Les informations d\'identification fournies sont incorrectes.',
         ]);
     }
 }

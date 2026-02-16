@@ -121,6 +121,6 @@ public function updatePassword(Request $request)
      */
     public function username()
     {
-        return 'email';
+        return 'work_email';
     }
 }

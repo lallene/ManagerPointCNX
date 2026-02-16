@@ -17,10 +17,9 @@ class CreatePlanningsTable extends Migration
             $table->id();
             $table->timestamps();
             $table->date('jour');
-            $table->time('heure_debut');
-            $table->time('heure_fin');
+            $table->time('entree');
+            $table->time('sortie');
             $table->string('semaine');
-            $table->string('Commentaire');
             $table->unsignedBigInteger('agent_id')->nullable();
             $table->foreign('agent_id')
                 ->references('id')

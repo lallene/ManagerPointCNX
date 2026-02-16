@@ -112,8 +112,8 @@
                                         $label = "";
 
                                         if ($planning) {
-                                            $debut = (int)\Carbon\Carbon::parse($planning->heure_debut)->format('H');
-                                            $fin = (int)\Carbon\Carbon::parse($planning->heure_fin)->format('H');
+                                            $debut = (int)\Carbon\Carbon::parse($planning->entree)->format('H');
+                                            $fin = (int)\Carbon\Carbon::parse($planning->sortie)->format('H');
                                             $inSlot = $h >= $debut && $h < $fin;
                                             // Affiche le titre uniquement sur la première heure du créneau
                                             if ($h == $debut) $label = $planning->activite ?? 'POSTE';

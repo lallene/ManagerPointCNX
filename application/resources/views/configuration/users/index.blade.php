@@ -31,9 +31,9 @@
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td>{{ $user->name }}</td>
-                                        <td>{{ $user->email }}</td>
+                                        <td>{{ $user->work_email }}</td>
                                         <td>{{ $user->roles[1] ?? '-' }}</td>
-                                        <td>{{ $user->email }}</td>
+                                        <td>{{ $user->work_email }}</td>
                                         <td class="text-center">
                                             <div class="dropdown_section">
                                                 <div class="dropdown">

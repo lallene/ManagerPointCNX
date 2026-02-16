@@ -50,10 +50,10 @@
                         @csrf
                         <fieldset>
                            <div class="field">
-                              <label for="email" class="label_field">Email Address</label>
-                              <input id="email" type="email" class="@error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus disabled>
+                              <label for="work_email" class="label_field">Email Address</label>
+                              <input id="work_email" type="email" class="@error('work_email') is-invalid @enderror" name="work_email" value="{{ old('work_email') }}" required autocomplete="work_email" autofocus disabled>
 
-                                @error('email')
+                                @error('work_email')
                                     <span class="invalid-feedback" role="alert">
                                         <strong>{{ $message }}</strong>
                                     </span>

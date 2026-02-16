@@ -87,37 +87,37 @@ public function decimalToTime($decimalHours) {
             ->select(
                 'agents.workday_id',
                 DB::raw("CONCAT(agents.nom, ' ', agents.prenom) as nom_prenom"),
-                'agents.email',
+                'agents.work_email',
                 'agents.fonction',
                 'sites.designation as site',
                 'projets.designation as projet',
                 DB::raw("COALESCE(CONCAT(managers.prenom, ' ', managers.nom), agents.manager) as manager"),
-                DB::raw("CONCAT(plannings.heure_debut, ' - ', plannings.heure_fin) as planning"),
+                DB::raw("CONCAT(plannings.entree, ' - ', plannings.sortie) as planning"),
                 'planificateurs.name as user_planificateur',
                 'plannings.updated_at as date_planification',
-                'plannings.jour',
+                'plannings.date_pointage',
                 'plannings.semaine',
 
-                DB::raw("MAX(CASE WHEN pointages.motif = 'debut' THEN pointages.heure END) as debut_shift_pointe"),
-                DB::raw("MAX(CASE WHEN pointages.motif = 'fin' THEN pointages.heure END) as fin_shift_pointe"),
-                DB::raw("MAX(CASE WHEN pointages.motif = 'debutpause' THEN pointages.heure END) as debut_pause_pointe"),
-                DB::raw("MAX(CASE WHEN pointages.motif = 'finpause' THEN pointages.heure END) as fin_pause_pointe")
+                DB::raw("MAX(entree) as debut_shift_pointe"),
+                DB::raw("MAX(sortie) as fin_shift_pointe"),
+                DB::raw("MAX(pause_debut) as debut_pause_pointe"),
+                DB::raw("MAX(pause_fin) as fin_pause_pointe")
             )
             ->whereNotNull('agents.workday_id')
-            ->whereNotNull('plannings.heure_debut')
+            ->whereNotNull('plannings.entree')
             ->groupBy(
                 'agents.workday_id',
                 'agents.nom',
                 'agents.prenom',
-                'agents.email',
+                'agents.work_email',
                 'agents.fonction',
                 'sites.designation',
                 'projets.designation',
                 'managers.prenom',
                 'managers.nom',
                 'agents.manager',
-                'plannings.heure_debut',
-                'plannings.heure_fin',
+                'plannings.entree',
+                'plannings.sortie',
                 'planificateurs.name',
                 'plannings.updated_at',
                 'plannings.jour',
@@ -215,15 +215,15 @@ public function weeklyReport()
             'projets.designation as projet',
             'plannings.semaine',
             'plannings.jour',
-            'plannings.heure_debut',
-            'plannings.heure_fin',
-            DB::raw("MAX(CASE WHEN pointages.motif = 'debut' THEN pointages.heure END) as debut_shift_pointe"),
-            DB::raw("MAX(CASE WHEN pointages.motif = 'fin' THEN pointages.heure END) as fin_shift_pointe"),
-            DB::raw("MAX(CASE WHEN pointages.motif = 'debutpause' THEN pointages.heure END) as debut_pause_pointe"),
-            DB::raw("MAX(CASE WHEN pointages.motif = 'finpause' THEN pointages.heure END) as fin_pause_pointe")
+            'plannings.entree',
+            'plannings.sortie',
+            DB::raw("MAX(entree) as debut_shift_pointe"),
+            DB::raw("MAX(sortie) as fin_shift_pointe"),
+            DB::raw("MAX(pause_debut) as debut_pause_pointe"),
+            DB::raw("MAX(pause_fin) as fin_pause_pointe")
         )
         ->whereNotNull('plannings.id')
-        ->groupBy('projets.designation', 'plannings.semaine', 'plannings.jour', 'plannings.heure_debut', 'plannings.heure_fin')
+        ->groupBy('projets.designation', 'plannings.semaine', 'plannings.jour', 'plannings.entree', 'plannings.sortie')
         ->orderBy('projets.designation')
         ->orderBy('plannings.semaine')
         ->orderBy('plannings.jour')
@@ -238,8 +238,8 @@ public function weeklyReport()
     $globalJours = array();
 
     foreach ($data as $item) {
-        $planningDebut = $toTime($item->heure_debut);
-        $planningFin   = $toTime($item->heure_fin);
+        $planningDebut = $toTime($item->entree);
+        $planningFin   = $toTime($item->sortie);
         $heureDebut    = $toTime($item->debut_shift_pointe);
         $heureFin      = $toTime($item->fin_shift_pointe);
         $pauseDebut    = $toTime($item->debut_pause_pointe);
@@ -371,45 +371,64 @@ public function weeklyReport()
 
 public function dashboard(Request $request)
 {
-    // Récupérer les semaines disponibles
-    $semaines = DB::table('plannings')
-        ->select('semaine', DB::raw('MIN(jour) as debut'), DB::raw('MAX(jour) as fin'))
-        ->groupBy('semaine')
-        ->orderBy('semaine')
-        ->get()
-        ->map(function($s) {
-            return ['numero' => $s->semaine, 'debut' => $s->debut, 'fin' => $s->fin];
-        });
+    // 1. Gestion des Semaines
+    $semaines = [];
+    $semaineActuelle = Carbon::now()->weekOfYear;
+    for ($i = $semaineActuelle - 3; $i <= $semaineActuelle + 3; $i++) {
+        if ($i < 1 || $i > 52) continue;
+        $start = Carbon::now()->startOfYear()->addWeeks($i - 1)->startOfWeek(Carbon::MONDAY);
+        $end = (clone $start)->endOfWeek(Carbon::SUNDAY);
+        $semaines[] = [
+            'numero' => $i, 'debut' => $start->format('d/m'), 'fin' => $end->format('d/m')
+        ];
+    }
+    $selectedWeek = $request->get('week', $semaineActuelle);
 
-    $selectedWeek = $request->get('week');
+    // 2. Flash Stats (Aujourd'hui)
+    $totalAgents = DB::table('agents')->count();
+    $presentsCount = DB::table('pointages')
+        ->whereDate('created_at', Carbon::today())
+        ->where('commentaires', 'debut')
+        ->distinct('planning_id')->count();
+    
+    $tauxPresence = ($totalAgents > 0) ? ($presentsCount / $totalAgents) * 100 : 0;
 
-    // Fonctions filtrées
-    $fonctions = $request->get('fonctions', []);
+    $absencesUrgent = DB::table('plannings')
+        ->whereDate('jour', Carbon::today())
+        ->whereNotExists(function ($query) {
+            $query->select(DB::raw(1))->from('pointages')
+                  ->whereRaw('pointages.planning_id = plannings.id')
+                  ->where('commentaires', 'debut');
+        })->count();
 
-    // Récupérer les rapports complets
-    $rapports = $this->weeklyReport(); // fonction précédemment codée
+    $totalOvertime = DB::table('pointages')
+        ->join('plannings', 'pointages.planning_id', '=', 'plannings.id')
+        ->where('plannings.semaine', $selectedWeek)
+        ->sum('pointages.heures_supp');
 
-    // Filtrer par semaine et fonctions
-    $rapports = array_filter($rapports['projets'], function($r) use ($selectedWeek, $fonctions) {
-        $ok = true;
-        if ($selectedWeek) {
-            $ok = $ok && ($r['semaine'] == $selectedWeek);
-        }
-        if (!empty($fonctions)) {
-            // On suppose que $r a un champ 'fonction' si nécessaire
-            $ok = $ok && in_array($r['fonction'] ?? '', $fonctions);
-        }
-        return $ok;
-    });
+    // 3. Données du Graphique (7 derniers jours)
+    $trendLabels = [];
+    $trendData = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $date = Carbon::today()->subDays($i);
+        $trendLabels[] = $date->format('D d/m');
+        $count = DB::table('pointages')->whereDate('created_at', $date)->where('commentaires', 'debut')->distinct('planning_id')->count();
+        $trendData[] = ($totalAgents > 0) ? round(($count / $totalAgents) * 100, 1) : 0;
+    }
 
-    return view('manager.dashboard', [
-        'semaines' => $semaines,
-        'selectedWeek' => $selectedWeek,
-        'rapports' => array_values($rapports),
-        'global_par_jour' => $rapports['global_par_jour'] ?? []
-    ]);
+    // 4. Live Feed
+    $lastPointages = DB::table('pointages')
+        ->join('plannings', 'pointages.planning_id', '=', 'plannings.id')
+        ->join('agents', 'plannings.agent_id', '=', 'agents.id')
+        ->select('agents.nom', 'agents.prenom',  'pointages.entree',  'pointages.fin','pointages.created_at')
+        ->latest('pointages.created_at')->take(5)->get();
+
+    return view('manager.dashboard', compact(
+        'semaines', 'selectedWeek', 'totalAgents', 'presentsCount', 
+        'tauxPresence', 'absencesUrgent', 'totalOvertime', 
+        'lastPointages', 'trendLabels', 'trendData'
+    ));
 }
-
 
 
 
@@ -456,12 +475,12 @@ public function dashboard(Request $request)
             'projets.designation as projet',
             'projets.site_id as site',
             'plannings.jour',
-            'plannings.heure_debut',
-            'plannings.heure_fin',
-            'pointages.date',
-            'pointages.heure',
-            'pointages.motif'
-        )
+            'plannings.entree',
+            'plannings.sortie',
+            'pointages.date_pointage',
+            'pointages.heure_sup',
+            'pointages.minutes_travaillees'
+            )
         ->get();
 
     $result = [];
@@ -473,8 +492,8 @@ public function dashboard(Request $request)
         $heuresPlanifiees = 0;
         foreach ($rows->groupBy('jour') as $jour => $plannings) {
             foreach ($plannings as $plan) {
-                $hd = \Carbon\Carbon::parse($plan->heure_debut);
-                $hf = \Carbon\Carbon::parse($plan->heure_fin);
+                $hd = \Carbon\Carbon::parse($plan->entree);
+                $hf = \Carbon\Carbon::parse($plan->sortie);
                 $heuresPlanifiees += $hd->diffInHours($hf);
             }
         }
@@ -483,16 +502,16 @@ public function dashboard(Request $request)
         $heuresAbsence = 0;
         foreach ($rows->groupBy('jour') as $jour => $plannings) {
             foreach ($plannings as $plan) {
-                if ($plan->motif === 'arrivee') {
-                    $heurePlanifiee = \Carbon\Carbon::parse($plan->heure_debut);
-                    $heurePointage = \Carbon\Carbon::parse($plan->heure ?? $plan->heure_debut);
+                if ($plan->commentaires === 'arrivee') {
+                    $heurePlanifiee = \Carbon\Carbon::parse($plan->entree);
+                    $heurePointage = \Carbon\Carbon::parse($plan->heure ?? $plan->entree);
                     if ($heurePointage->gt($heurePlanifiee)) {
                         $heuresAbsence += $heurePlanifiee->diffInHours($heurePointage);
                     }
                 }
-                if ($plan->motif === 'depart') {
-                    $heureFinPlanifiee = \Carbon\Carbon::parse($plan->heure_fin);
-                    $heureDepart = \Carbon\Carbon::parse($plan->heure ?? $plan->heure_fin);
+                if ($plan->commentaires === 'depart') {
+                    $heureFinPlanifiee = \Carbon\Carbon::parse($plan->sortie);
+                    $heureDepart = \Carbon\Carbon::parse($plan->heure ?? $plan->sortie);
                     if ($heureDepart->lt($heureFinPlanifiee)) {
                         $heuresAbsence += $heureDepart->diffInHours($heureFinPlanifiee);
                     }

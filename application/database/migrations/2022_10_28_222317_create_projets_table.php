@@ -16,11 +16,10 @@ class CreateProjetsTable extends Migration
         Schema::create('projets', function (Blueprint $table) {
             $table->engine = 'InnoDB';
             $table->id();
-            $table->text('description')->nullable();
+            $table->text('designation')->nullable();
             $table->string('dltsuperviseur');
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('msa_id')->nullable();
-
             $table->foreign('site_id')
                 ->references('id')
                 ->on('sites')

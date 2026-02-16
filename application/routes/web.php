@@ -7,9 +7,10 @@ use App\Http\Controllers\ProjetController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\PointageController;
 use App\Http\Controllers\RapportControlleur;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RoleController;
 
-
-
+use App\Http\Livewire\Dashboard;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,11 +24,8 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/home', [HomeController::class, 'index'])->name('home');
-Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/home/data', [HomeController::class, 'ajaxData'])->name('home.data'); // flux JSON
 Route::get('/home/weeklyReport', [HomeController::class, 'weeklyReport'])->name('home.weeklyReport'); // flux JSON
-Route::get('/manager/dashboard', [HomeController::class, 'dashboard'])->name('manager.dashboard');
 Route::get('/manager/export/excel', [HomeController::class, 'exportExcel'])->name('manager.export.excel');
 Route::get('/manager/export/pdf', [HomeController::class, 'exportPdf'])->name('manager.export.pdf');
 Route::get('/findProjet/{id}', [HomeController::class, 'findProjet'])->name('findProjet');
@@ -76,24 +74,32 @@ Route::get('api/agents', [AgentController::class, 'index']);
 Route::get('/effectifs',[App\Http\Controllers\AgentController::class, 'liste'])->name('effectifs');
 Route::get('/planification',[App\Http\Controllers\PlanningController::class, 'index'])->name('planification');
 Route::post('/planning', [PlanningController::class, 'store'])->name('planning.store');
-Route::get('/planning/group', [PlanningController::class, 'showGroupPlanning'])->name('planning.group');
-Route::get('/planning/group-journee', [PlanningController::class, 'showGroupPlanningDay'])->name('planning.group.journee')->middleware('role:Manager|Responsables d’équipe');
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.PlanningGlobal');
 Route::get('/projets-par-site/{site}', [HomeController::class, 'getProjetsParSite'])->name('projets.par.site');
 Route::post('/plannings/import', [PlanningController::class, 'import'])->name('plannings.import');
 Route::get('/planning/journee-graph', [PlanningController::class, 'planningJourneeGraphique'])->name('planning.journee.graphique')->middleware('role:Manager');
 
 
-Route::prefix('pointages')->middleware('auth')->group(function () {
-    Route::get('/', [PointageController::class, 'PointageGlobal'])->name('pointages.global');
-    Route::get('/test', [PointageController::class, 'index'])->name('pointages.test');
-    Route::get('/creer', [PointageController::class, 'create'])->name('pointages.create')->middleware('role:Manager');
-    Route::get('/group', [PointageController::class, 'group'])->name('pointages.group');
-    Route::post('/', [PointageController::class, 'store'])->name('pointages.store');
-    Route::put('/{pointage}', [PointageController::class, 'update'])->name('pointages.update');
-    Route::delete('/{pointage}', [PointageController::class, 'destroy'])->name('pointages.destroy');
-});
+// 1. La route qui affiche la page vide avec les filtres
+Route::get('/planning/group', [PlanningController::class, 'showGroupPlanningView'])->name('planning.group');
 
+// 2. La route API que le JavaScript appellera pour remplir le tableau
+Route::get('/api/planning/group-data', [PlanningController::class, 'getPlanningData'])->name('planning.group.data');
+
+
+
+// Groupe Pointages
+Route::prefix('pointages')->middleware('auth')->group(function () {
+    // 1. La page d'affichage (Le tableau vide avec les filtres)
+    Route::get('/suivi-hebdo', [PointageController::class, 'index'])->name('pointages.index');
+    
+    // 2. Le flux de données JSON (Appelé par jQuery)
+    Route::get('/api-global', [PointageController::class, 'PointageGlobal'])->name('pointages.global');
+
+    // Autres routes existantes
+    Route::get('/creer', [PointageController::class, 'create'])->name('pointages.create')->middleware('role:Manager');
+    Route::post('/', [PointageController::class, 'store'])->name('pointages.store');
+});
 
 
 Route::get('/rapport/pointages', [RapportControlleur::class, 'index'])->name('rapport.pointages');
@@ -108,6 +114,7 @@ Route::post('/importmatricule', [App\Http\Controllers\MatriculeControlleur::clas
 
 
 
+Route::get('/', [App\Http\Controllers\DashboardController::class, 'index'])->name('home')->middleware('auth');
 
 
 Route::get('/rapport', [App\Http\Controllers\RapportController::class, 'index'])->name('rapport');
@@ -120,7 +127,20 @@ Route::get('/send-rapport', [App\Http\Controllers\RapportController::class, 'sen
 Route::get('/rapport/taux-absence', [HomeController::class, 'tauxAbsence'])->name('rapport.taux.absence');
 
 
+Route::get('profil/permission/{id}', [RoleController::class, 'permissions'])->name('profil.permissions');
+Route::get('profil/permission/add/{id}', [RoleController::class, 'addPermission'])->name('profil.permissions.add');
+Route::post('profil/permission/grant/{id}', [RoleController::class, 'grantPermission'])->name('profil.permissions.grant');
 
-Route::any('{url}', function(){
-    return redirect()->route('login');
-})->where('url', '.*');
+
+// Gestion des profils (Ressource standard)
+Route::resource('profil', RoleController::class);
+
+// Gestion spécifique des permissions
+// 1. Liste des permissions d'un rôle
+Route::get('profil/permission/{id}', [RoleController::class, 'permissions'])->name('profil.permissions');
+
+// 2. Formulaire pour cocher les permissions
+Route::get('profil/permission/add/{id}', [RoleController::class, 'addPermission'])->name('profil.permissions.add');
+
+// 3. Traitement de l'enregistrement (POST ou PUT)
+Route::post('profil/grantPermission/{id}', [RoleController::class, 'grantPermission'])->name('profil.permissions.grant');

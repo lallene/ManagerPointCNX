@@ -5,140 +5,169 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
     public function __construct()
     {
         $this->middleware('auth');
-      //  $this->middleware('role:IT');
-
     }
 
     /**
-     * Show the application dashboard.
-     *
-     * @return \Illuminate\Contracts\Support\Renderable
+     * Liste tous les profils (rôles)
      */
     public function index()
     {
         $roles = Role::all();
-        return view('configuration.role.liste', ['titre' => "Liste des Profils Utilisateur", 'roles' => $roles]);
+        return view('configuration.role.liste', [
+            'titre' => "Liste des Profils Utilisateur", 
+            'roles' => $roles
+        ]);
     }
 
     public function create()
     {
-        $roles = Role::all();
-        return view('configuration.role.create', ['titre' => "Ajouter un Profil Utilisateur", 'roles' => $roles]);
+        return view('configuration.role.create', ['titre' => "Ajouter un Profil Utilisateur"]);
     }
 
+    /**
+     * Enregistre un nouveau profil
+     */
     public function store(Request $request)
     {
-        Role::create(
-            [
-                'name' => $request->input('guard_name'),
-                'guard_name' => 'web'
-            ]
-        );
+        $request->validate([
+            'name'       => 'required|string|max:190|unique:roles,name',
+            'guard_name' => 'required|string|max:190',
+        ]);
 
-        return redirect()->route('profil.index');
+        try {
+            Role::create([
+                'name'       => $request->input('name'),
+                'guard_name' => $request->input('guard_name'),
+            ]);
+
+            return redirect()->route('profil.index')->with('success', 'Profil créé avec succès.');
+        } catch (\Exception $e) {
+            return redirect()->back()->withInput()->with('error', 'Erreur : ' . $e->getMessage());
+        }
     }
 
     public function edit($id)
     {
-        $role = Role::find($id);
-        return view('configuration.role.edit', ['titre' => "Modifier Profil Utilisateur ".$role->name, 'role' => $role]);
+        $role = Role::findOrFail($id);
+        return view('configuration.role.edit', [
+            'titre' => "Modifier Profil : ".$role->name, 
+            'role' => $role
+        ]);
     }
 
+    /**
+     * Met à jour le nom technique ou le guard
+     */
     public function update(Request $request, $id)
     {
-        $role = Role::find($id);
+        $role = Role::findOrFail($id);
 
-        $role->guard_name = $request->input('guard_name');
+        $request->validate([
+            'name'       => 'required|string|max:190|unique:roles,name,' . $id,
+            'guard_name' => 'required|string|max:190',
+        ]);
 
-        try{
-            $role->save();
-        }catch (\Exception $e){
-            echo'e';
+        try {
+            $role->update([
+                'name'       => $request->input('name'),
+                'guard_name' => $request->input('guard_name'),
+            ]);
+
+            return redirect()->route('profil.index')->with('success', 'Profil mis à jour.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Erreur de mise à jour.');
         }
-        return redirect()->route('profil.index');
     }
 
+    /**
+     * Affiche les permissions actuelles du profil
+     * C'est cette méthode qui résout ta 404 sur 'profil/permission/{id}'
+     */
     public function permissions($id)
     {
-
         $role = Role::with('permissions')->findOrFail($id);
-
-        $permissions = $role->permissions;
-
         return view('configuration.role.listePermission', [
-            'titre'       => "Liste des Permissions du Profil " . $role->name, 
-            'permissions' => $permissions, 
+            'titre'       => "Permissions du Profil " . $role->name, 
+            'permissions' => $role->permissions, 
             'role'        => $role
         ]);
     }
-    public function addPermission($id){
-        $temp = Role::find($id);
-        $role = Role::findById($temp->id, $temp->guard_name);
 
-        $x = $role->load('permissions');
-
-        $permissions = Permission::all();
-
-        foreach ($permissions as $key => $permission) {
-            //echo('<pre>'); die(print_r($permission));
-            if($role->hasPermissionTo($permission->name)){
-                $permissions[$key]->Checked = 'checked';
-            }else{
-                $permissions[$key]->Checked = '';
-            }
-            //$role->hasPermissionTo('edit articles');
-        }
-
-        //echo('<pre>'); die(print_r($permissions));
-        return view('configuration.role.ajouterPermission', ['titre' => "Ajouter Permissions du Profil ".$role->name, 'role' => $role, 'permissions' => $permissions]);
-    }
-
-    public function grantPermission(Request $request, $id){
-        $temp = Role::find($id);
-        $role = Role::findByName($temp->name);
-
-        $permissions = Permission::all();
-
-        //echo('<pre>'); die(print_r($role));
-
-        foreach ($permissions as $permission) {
-            $role->revokePermissionTo($permission->name);
-            if(isset($_POST['role_'.$permission->id]) AND $_POST['role_'.$permission->id] == 'on'){
-                $role->givePermissionTo($permission->name);
-            }
-        }
-        return redirect('profil/permission/'.$id);
-        //echo('<pre>'); die(print_r($_POST));
-    }
-
-    public function revoquer($idRole, $idPermission){
-        $role = Role::findById($idRole);
-
-        $permission = Permission::findById($idPermission);
-
-        if($role->hasPermissionTo($permission->name)){
-            $role->revokePermissionTo($permission->name);
-        }
-
-        return redirect()->back()->withInput();
-    }
-
-        public function destroy($id)
+    /**
+     * Formulaire pour ajouter/modifier les permissions (Checkboxes)
+     */
+    public function addPermission($id)
     {
         $role = Role::findOrFail($id);
-        $role->delete();
+        $permissions = Permission::all();
 
-        return redirect()->route('profil.index')->with('success', 'Rôle supprimé avec succès.');
+        // On récupère les noms des permissions déjà associées à ce rôle dans un tableau
+        $rolePermissions = $role->permissions->pluck('name')->toArray();
+
+        foreach ($permissions as $key => $permission) {
+            // On vérifie si le nom de la permission est dans le tableau du rôle
+            // Cela évite l'appel à hasPermissionTo() qui fait planter la page
+            $permissions[$key]->Checked = in_array($permission->name, $rolePermissions) ? 'checked' : '';
+        }
+
+        return view('configuration.role.ajouterPermission', [
+            'titre' => "Gérer les accès : " . $role->name, 
+            'role' => $role, 
+            'permissions' => $permissions
+        ]);
+    }
+
+    /**
+     * Traitement massif des permissions (Attribution/Révocation)
+     */
+    public function grantPermission(Request $request, $id)
+{
+    $role = Role::findOrFail($id);
+    
+    // On récupère toutes les permissions existantes en base de données
+    $permissions = Permission::all();
+
+    foreach ($permissions as $permission) {
+        $inputName = 'role_' . $permission->id;
+        
+        if ($request->has($inputName) && $request->input($inputName) == 'on') {
+            // On donne la permission en utilisant l'objet directement (évite l'erreur de nom)
+            $role->givePermissionTo($permission);
+        } else {
+            // On révoque uniquement si le rôle possède déjà la permission
+            if ($role->hasPermissionTo($permission->name)) {
+                $role->revokePermissionTo($permission);
+            }
+        }
+    }
+
+    return redirect()->route('profil.permissions', $id)->with('success', 'Droits mis à jour.');
+}
+    /**
+     * Supprime un profil avec vérification de sécurité
+     */
+    public function destroy($id)
+    {
+        try {
+            $role = Role::findOrFail($id);
+            
+            // Sécurité : Ne pas supprimer si des agents ont ce profil
+            $userCount = DB::table('model_has_roles')->where('role_id', $id)->count();
+            if ($userCount > 0) {
+                return redirect()->back()->with('error', "Ce profil est utilisé par $userCount agent(s).");
+            }
+
+            $role->delete();
+            return redirect()->route('profil.index')->with('success', 'Profil supprimé.');
+        } catch (\Exception $e) {
+            return redirect()->route('profil.index')->with('error', 'Erreur de suppression.');
+        }
     }
 }

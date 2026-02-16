@@ -32,12 +32,12 @@
                             </div>
 
                             <div class="row mb-3">
-                                <label for="email" class="col-md-2 pr-0 col-form-label text-md-end">Adresse Email</label>
+                                <label for="work_email" class="col-md-2 pr-0 col-form-label text-md-end">Adresse Email</label>
 
                                 <div class="col-md-10">
-                                    <input id="email" type="email" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email">
+                                    <input id="work_email" type="email" class="form-control @error('work_email') is-invalid @enderror" name="work_email" value="{{ old('work_email') }}" required autocomplete="work_email">
 
-                                    @error('email')
+                                    @error('work_email')
                                         <span class="invalid-feedback" role="alert">
                                             <strong>{{ $message }}</strong>
                                         </span>

@@ -1,149 +1,218 @@
 @extends('layouts.app')
 
 @section('content')
-<style>
-    /* Correction pour écrans larges */
-    @media (min-width: 1598px) {
-        .container { max-width: 1598px !important; }
-    }
+    <style>
+        /* Harmonisation Signature ManagerPoint */
+        .column_title {
+            background: var(--white);
+            padding: 1.5rem;
+            margin: -1rem -1rem 2rem -1rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
 
-    /* Style du titre */
-    .styled-title {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 2.2rem;
-        color: #1d4750;
-        font-weight: 700;
-        margin-top: 88px;
-        margin-bottom: 19px;
-        text-align: center;
-    }
+        .column_title h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--nav-bg);
+            /* Ton bleu foncé */
+            margin: 0;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
 
-    /* Personnalisation du tableau */
-    #usersTable {
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 0 15px rgba(0,0,0,0.05);
-    }
+        .column_title h2::before {
+            content: "";
+            width: 4px;
+            height: 20px;
+            background: var(--accent);
+            /* Ton vert action */
+            display: inline-block;
+            margin-right: 12px;
+            border-radius: 2px;
+        }
 
-    #usersTable thead th {
-        background-color: #1d4750;
-        color: white;
-        text-align: center;
-        vertical-align: middle;
-        border: none;
-    }
+        /* Tableaux Style Audit */
+        #usersTable {
+            border-collapse: separate !important;
+            border-spacing: 0;
+            width: 100% !important;
+        }
 
-    .dt-buttons .btn {
-        margin-bottom: 10px;
-        border-radius: 5px !important;
-        font-weight: 600;
-    }
-</style>
+        #usersTable thead th {
+            background-color: #f1f5f9 !important;
+            color: #475569 !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            padding: 12px;
+            border: none !important;
+        }
 
-<div class="container-fluid">
-    <div class="row">
+        #usersTable tbody td {
+            padding: 12px;
+            vertical-align: middle;
+            font-size: 0.85rem;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        /* Badge de rôle personnalisé */
+        .badge-role {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+
+        /* Style des boutons DataTables */
+        .dt-buttons {
+            margin-bottom: 1.5rem;
+        }
+
+        .dt-buttons .btn {
+            font-weight: 600;
+            font-size: 0.75rem;
+            border-radius: 6px !important;
+            margin-right: 5px;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+
+    <div class="container-fluid">
+        {{-- En-tête de page --}}
+        <div class="row">
             <div class="col-md-12">
                 <div class="column_title">
                     <h2>👥 Gestion des Utilisateurs</h2>
                     <div class="breadcrumb-custom d-none d-md-block">
-                        <span>ManagerPoint</span> / <span> Gestion des Utilisateurs</span>
+                        <small class="text-muted">ManagerPoint / Administration / Utilisateurs</small>
                     </div>
                 </div>
             </div>
-    </div>
-    <div class="card border-0 shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table id="usersTable" class="table table-striped table-hover align-middle w-100">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nom</th>
-                            <th>Email</th>
-                            <th>Fonction</th>
-                            <th>Rôle</th>
-                            <th>Projet</th>
-                            <th>Site</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                </table>
+        </div>
+
+        {{-- Carte du tableau --}}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="table-responsive">
+                    <table id="usersTable" class="table table-hover w-100">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nom & Prénom</th>
+                                <th>Email</th>
+                                <th>Fonction</th>
+                                <th>Rôle</th>
+                                <th>Projet</th>
+                                <th>Site</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-</div>
 @endsection
 
 @push('scripts')
-    {{-- DataTables CSS --}}
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
+    {{-- Utilisation de Bootstrap 5 pour DataTables pour la cohérence visuelle --}}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 
-    {{-- DataTables JS & Extensions --}}
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script>
-    $(document).ready(function() {
-        // Nettoyage avant initialisation
-        if ($.fn.DataTable.isDataTable('#usersTable')) {
-            $('#usersTable').DataTable().destroy();
-        }
-
-        $('#usersTable').DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: "{{ route('users.ajax') }}",
-            columns: [
-                { data: 'user_id',     name: 'user_id' },
-                { data: 'name',        name: 'name' },
-                { data: 'email',       name: 'email' },
-                { data: 'fonction',    name: 'agents.fonction' },
-                { data: 'role',        name: 'role' },
-                { data: 'projet',      name: 'projet' },
-                { data: 'site',        name: 'site' },
-                {
-                    data: 'action',
-                    name: 'action',
-                    orderable: false,
-                    searchable: false,
-                    className: 'text-center'
-                }
-            ],
-            dom: 'lBfrtip',
-            buttons: [
-                { extend: 'copy',  text: 'Copier', className: 'btn btn-secondary btn-sm' },
-                { extend: 'excel', text: 'Excel',  className: 'btn btn-success btn-sm' },
-                { extend: 'pdf',   text: 'PDF',    className: 'btn btn-danger btn-sm' },
-                { extend: 'print', text: 'Imprimer', className: 'btn btn-info btn-sm' }
-            ],
-            pageLength: 50,
-            lengthMenu: [[50, 100, 200, -1], ['50', '100', '200', 'Tous']],
-            
-            // TRADUCTION LOCALE DIRECTE
-            language: {
-                "sEmptyTable":     "Aucune donnée disponible",
-                "sInfo":           "Affichage de _START_ à _END_ sur _TOTAL_ utilisateurs",
-                "sInfoEmpty":      "Affichage de 0 à 0 sur 0 utilisateur",
-                "sInfoFiltered":   "(filtré de _MAX_ au total)",
-                "sLengthMenu":     "Afficher _MENU_ éléments",
-                "sLoadingRecords": "Chargement...",
-                "sProcessing":     "Traitement en cours...",
-                "sSearch":         "Rechercher :",
-                "sZeroRecords":    "Aucun résultat trouvé",
-                "oPaginate": {
-                    "sFirst":    "Premier",
-                    "sLast":     "Dernier",
-                    "sNext":     "Suivant",
-                    "sPrevious": "Précédent"
-                }
+        $(document).ready(function() {
+            if ($.fn.DataTable.isDataTable('#usersTable')) {
+                $('#usersTable').DataTable().destroy();
             }
+
+            $('#usersTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: "{{ route('users.ajax') }}",
+                columns: [{
+                        data: 'user_id',
+                        name: 'user_id'
+                    },
+                    {
+                        data: 'name',
+                        name: 'name',
+                        render: function(data) {
+                            return '<span class="fw-bold text-dark">' + data + '</span>';
+                        }
+                    },
+                    {
+                        data: 'work_email',
+                        name: 'work_email'
+                    },
+                    {
+                        data: 'fonction',
+                        name: 'agents.fonction'
+                    },
+                    {
+                        data: 'role',
+                        name: 'role',
+                        render: function(data) {
+                            var badgeClass = data === 'Admin' ?
+                                'bg-light text-danger border-danger' :
+                                'bg-light text-primary border-primary';
+                            return '<span class="badge border ' + badgeClass + '">' + data +
+                                '</span>';
+                        }
+                    },
+                    {
+                        data: 'projet',
+                        name: 'projet'
+                    },
+                    {
+                        data: 'site',
+                        name: 'site'
+                    },
+                    {
+                        data: 'action',
+                        name: 'action',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center'
+                    }
+                ],
+                dom: '<"d-flex justify-content-between align-items-center mb-4"lBf>rtip',
+                buttons: [{
+                        extend: 'excel',
+                        className: 'btn btn-outline-success btn-sm',
+                        text: '<i class="far fa-file-excel me-1"></i> Excel'
+                    },
+                    {
+                        extend: 'pdf',
+                        className: 'btn btn-outline-danger btn-sm',
+                        text: '<i class="far fa-file-pdf me-1"></i> PDF'
+                    }
+                ],
+                pageLength: 50,
+                language: {
+                    "search": "Rechercher :",
+                    "lengthMenu": "Afficher _MENU_",
+                    "info": "Affichage de _START_ à _END_ sur _TOTAL_ utilisateurs",
+                    "paginate": {
+                        "next": "Suivant",
+                        "previous": "Précédent"
+                    },
+                    "processing": "<div class='spinner-border text-primary' role='status'></div>"
+                }
+            });
         });
-    });
     </script>
 @endpush

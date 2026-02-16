@@ -10,45 +10,32 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+   use HasApiTokens, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+   use HasRoles;
+
     protected $fillable = [
         'name',
-        'email',
+        'work_email',
         'password',
         'password_first_connection',
-
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
+        // On cache aussi le mot de passe temporaire des réponses API
+        'password_first_connection', 
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
-
-        public function agent()
+    
+    // Relation avec l'Agent (si un utilisateur est lié à un agent)
+    public function agent()
     {
-        return $this->hasOne(Agent::class, 'email', 'email');
+        return $this->hasOne(Agent::class, 'work_email', 'work_email');
     }
-
-
 
 }

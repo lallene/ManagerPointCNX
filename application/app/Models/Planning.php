@@ -9,14 +9,14 @@ class Planning extends Model
 {
     protected $fillable = [
         'jour',
-        'heure_debut',
-        'heure_fin',
+        'entree',
+        'sortie',
         'semaine',
         'agent_id',
         'user_id',
     ];
 
-    protected $dates = ['jour', 'heure_debut', 'heure_fin'];
+    protected $dates = ['jour', 'entree', 'sortie'];
 
     public function agent()
     {

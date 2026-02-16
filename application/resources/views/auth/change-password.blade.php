@@ -97,11 +97,11 @@
             @csrf
 
             <div class="mb-3">
-                <label for="email" class="form-label">Adresse e-mail</label>
-                <input id="email" type="email"
-                       class="form-control @error('email') is-invalid @enderror"
-                       name="email" value="{{ old('email') }}" required autofocus>
-                @error('email')
+                <label for="work_email" class="form-label">Adresse e-mail</label>
+                <input id="work_email" type="email"
+                       class="form-control @error('work_email') is-invalid @enderror"
+                       name="work_email" value="{{ old('work_email') }}" required autofocus>
+                @error('work_email')
                     <span class="text-danger small">{{ $message }}</span>
                 @enderror
             </div>

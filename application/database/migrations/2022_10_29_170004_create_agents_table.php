@@ -14,23 +14,23 @@
         public function up()
         {
             Schema::create('agents', function (Blueprint $table) {
-                $table->engine = 'InnoDB';
-                $table->id();
-                $table->string('workday_id');
-                $table->string('nom');
-                $table->string('prenom');
-                $table->string('work_email')->unique();
-                $table->string('fonction');
-                $table->string('manager')->nullable();
-                $table->unsignedBigInteger('projet_id')->nullable();
-                $table->string('Matricule_salarie')->nullable();
-                $table->string('responsable')->nullable();
-                $table->foreign('projet_id')
-                    ->references('id')
-                    ->on('projets')
-                    ->onDelete('cascade')
-                    ->onUpdate('cascade');         
-            });
+            $table->id(); 
+            $table->string('workday_id')->unique(); 
+            $table->string('prenom');
+            $table->string('nom');
+            $table->string('work_email')->unique();
+            $table->string('fonction');
+            
+            $table->string('manager')->nullable()->index(); 
+            
+            $table->foreignId('projet_id')
+                ->nullable()
+                ->constrained('projets')
+                ->onDelete('cascade')
+                ->onUpdate('cascade');
+
+            $table->timestamps(); 
+        });
         }
 
         /**

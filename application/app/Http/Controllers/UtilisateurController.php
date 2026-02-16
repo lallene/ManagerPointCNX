@@ -55,14 +55,14 @@ class UtilisateurController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email|max:255',
+            'work_email' => 'required|work_email|unique:users,work_email|max:255',
             'password_first_connection' => 'required|string|min:8',
             'role_id' => 'required|exists:roles,id',
         ]);
 
         $user = User::create([
             'name' => $request->name,
-            'email' => $request->email,
+            'work_email' => $request->work_email,
             'password' => Hash::make('temporary'), // Mot de passe temporaire
             'password_first_connection' => true,  // Flag pour la première connexion
         ]);
@@ -109,13 +109,13 @@ class UtilisateurController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
+            'work_email' => 'required|email|unique:users,work_email,' . $id,
             'password_first_connection' => 'nullable|string|min:8',
             'role_id' => 'required|exists:roles,id',
         ]);
 
         $user->name = $request->name;
-        $user->email = $request->email;
+        $user->work_email = $request->work_email;
 
         if ($request->filled('password_first_connection')) {
             $user->password_first_connection = Hash::make($request->password_first_connection);
@@ -251,7 +251,7 @@ class UtilisateurController extends Controller
     public function ajax()
 {
     $query = DB::table('users')
-        ->join('agents', 'agents.email', '=', 'users.email')
+        ->join('agents', 'agents.work_email', '=', 'users.work_email')
         ->join('projets', 'agents.projet_id', '=', 'projets.id')
         ->join('sites', 'projets.site_id', '=', 'sites.id')
         ->leftJoin('model_has_roles', function ($join) {
@@ -262,7 +262,7 @@ class UtilisateurController extends Controller
         ->select([
             'users.id as user_id', // Alias pour l'affichage
             'users.name',
-            'users.email',
+            'users.work_email',
             'agents.fonction as fonction',
             'roles.name as role',
             'projets.designation as projet',

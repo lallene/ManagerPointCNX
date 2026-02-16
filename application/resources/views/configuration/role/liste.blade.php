@@ -1,125 +1,189 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="column_title">
-                <h2>{{ $titre }}</h2>
-                <div class="breadcrumb-custom d-none d-md-block">
-                    <span>ManagerPoint</span> / <span>{{ $titre }}</span>
-                </div>
+    <style>
+        /* Signature visuelle ManagerPoint */
+        .column_title {
+            background: var(--white);
+            padding: 1.5rem;
+            margin: -1rem -1rem 2rem -1rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .column_title h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--nav-bg);
+            margin: 0;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+
+        .column_title h2::before {
+            content: "";
+            width: 4px;
+            height: 20px;
+            background: var(--accent);
+            display: inline-block;
+            margin-right: 12px;
+            border-radius: 2px;
+        }
+
+        /* Style du tableau Audit */
+        .table thead th {
+            background-color: #f1f5f9 !important;
+            color: #475569 !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            border: none !important;
+        }
+
+        .table td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+
+        .role-name {
+            font-weight: 700;
+            color: var(--nav-bg);
+        }
+
+        /* Boutons d'actions compacts */
+        .btn-action {
+            width: 35px;
+            height: 35px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            margin: 0 2px;
+            transition: all 0.2s;
+        }
+
+        .btn-permission {
+            width: auto;
+            padding: 0 12px;
+            height: 35px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+    </style>
+
+    <div class="container-fluid">
+        {{-- En-tête de page --}}
+        <div class="column_title">
+            <h2><i class="fas fa-user-shield me-2"></i> {{ $titre }}</h2>
+            <div class="breadcrumb-custom d-none d-md-block">
+                <small class="text-muted">ManagerPoint / Paramètres / Profils & Rôles</small>
             </div>
         </div>
-    </div>
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white py-3">
-                    <div class="row align-items-center">
-                        <div class="col-md-12 text-right">
-                            <a href="{{ route('profil.create') }}" class="btn btn-primary shadow-sm">
-                                <i class="fa fa-plus"></i> Ajouter un Profil
-                            </a>
-                            <a href="{{ route('home') }}" class="btn btn-danger shadow-sm">
-                                <i class="fa fa-sign-out"></i> Quitter
-                            </a>
-                        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small fw-bold text-uppercase">Niveaux d'accès utilisateurs</span>
+                    <div>
+                        <a href="{{ route('profil.create') }}" class="btn btn-primary btn-sm shadow-sm px-3">
+                            <i class="fa fa-plus-circle me-1"></i> Ajouter un Profil
+                        </a>
+                        <a href="{{ route('home') }}" class="btn btn-outline-danger btn-sm px-3 ms-2">
+                            <i class="fa fa-sign-out-alt"></i> Quitter
+                        </a>
                     </div>
                 </div>
-                
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="zero_config" class="table table-striped table-bordered align-middle">
-                            <thead class="thead-dark">
+            </div>
+
+            <div class="card-body p-4">
+                <div class="table-responsive">
+                    <table id="zero_config" class="table table-hover w-100">
+                        <thead>
+                            <tr>
+                                <th style="width: 70px;">#</th>
+                                <th>Désignation (Rôle)</th>
+                                <th class="text-center">Gestion des Droits</th>
+                                <th class="text-center" style="width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($roles as $index => $role)
                                 <tr>
-                                    <th style="width: 50px;">#</th>
-                                    <th>Désignation (Rôle)</th>
-                                    <th class="text-center" style="width: 150px;">Action</th>
+                                    <td class="text-muted">#{{ $index + 1 }}</td>
+                                    <td>
+                                        <span class="role-name">{{ $role->name }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{{ URL::to('profil/permission/' . $role->id) }}"
+                                            class="btn btn-outline-warning btn-permission">
+                                            <i class="fa fa-lock me-1"></i> Permissions
+                                        </a>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex justify-content-center">
+                                            <a href="{{ route('profil.edit', $role->id) }}"
+                                                class="btn btn-outline-primary btn-action" title="Modifier le nom">
+                                                <i class="fa fa-edit"></i>
+                                            </a>
+
+                                            <form action="{{ route('profil.destroy', $role->id) }}" method="POST"
+                                                onsubmit="return confirm('Supprimer ce profil ?');" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-outline-danger btn-action"
+                                                    title="Supprimer">
+                                                    <i class="fa fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @if(isset($roles) && $roles->count() > 0)
-                                    @foreach ($roles as $index => $role)
-                                        <tr>
-                                            <td>{{ $index + 1 }}</td>
-                                            <td class="font-weight-bold">{{ $role->name }}</td>
-                                            <td class="text-center">
-                                                <div class="dropdown">
-                                                    <button type="button" class="btn btn-success btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                        <i class="fa fa-cog"></i> Actions
-                                                    </button>
-                                                    <div class="dropdown-menu dropdown-menu-right">
-                                                        <a class="dropdown-item" href="{{ route('profil.edit', $role->id) }}">
-                                                            <i class="fa fa-edit text-primary"></i> Modifier
-                                                        </a>
-                                                        <a class="dropdown-item" href="{{ URL::to('profil/permission/'.$role->id) }}">
-                                                            <i class="fa fa-lock text-warning"></i> Permissions
-                                                        </a>
-                                                        <div class="dropdown-divider"></div>
-                                                        <form action="{{ route('profil.destroy', $role->id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce profil ?');">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="dropdown-item text-danger">
-                                                                <i class="fa fa-trash"></i> Supprimer
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @else
-                                    <tr>
-                                        <td colspan="3" class="text-center text-muted py-4">Aucun profil enregistré pour le moment.</td>
-                                    </tr>
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
-</div>
 @endsection
 
 @push('scripts')
-    {{-- On garde les bibliothèques sur le CDN (elles ne causent pas de CORS en général) --}}
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
+    {{-- Intégration DataTables Bootstrap 5 --}}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
-    $(document).ready(function() {
-        $('#zero_config').DataTable({
-            "pageLength": 25,
-            "order": [[ 0, "asc" ]],
-            
-            // TRADUCTION LOCALE (Remplace l'URL externe qui cause l'erreur CORS)
-            "language": {
-                "sEmptyTable":     "Aucune donnée disponible dans le tableau",
-                "sInfo":           "Affichage de l'élément _START_ à _END_ sur _TOTAL_ éléments",
-                "sInfoEmpty":      "Affichage de l'élément 0 à 0 sur 0 élément",
-                "sInfoFiltered":   "(filtré à partir de _MAX_ éléments au total)",
-                "sInfoPostFix":    "",
-                "sInfoThousands":  ",",
-                "sLengthMenu":     "Afficher _MENU_ éléments",
-                "sLoadingRecords": "Chargement...",
-                "sProcessing":     "Traitement en cours...",
-                "sSearch":         "Rechercher :",
-                "sZeroRecords":    "Aucun élément correspondant trouvé",
-                "oPaginate": {
-                    "sFirst":    "Premier",
-                    "sLast":     "Dernier",
-                    "sNext":     "Suivant",
-                    "sPrevious": "Précédent"
-                },
-                "oAria": {
-                    "sSortAscending":  ": activer pour trier la colonne par ordre croissant",
-                    "sSortDescending": ": activer pour trier la colonne par ordre décroissant"
-                }
+        $(document).ready(function() {
+            if ($.fn.DataTable.isDataTable('#zero_config')) {
+                $('#zero_config').DataTable().destroy();
             }
+
+            $('#zero_config').DataTable({
+                "pageLength": 25,
+                "order": [
+                    [0, "asc"]
+                ],
+                "dom": '<"d-flex justify-content-between align-items-center mb-3"lf>rtip',
+                "language": {
+                    "search": "Rechercher :",
+                    "lengthMenu": "Afficher _MENU_",
+                    "info": "Affichage de _START_ à _END_ sur _TOTAL_ profils",
+                    "paginate": {
+                        "next": "Suivant",
+                        "previous": "Précédent"
+                    },
+                    "emptyTable": "Aucun profil enregistré."
+                }
+            });
         });
-    });
     </script>
 @endpush

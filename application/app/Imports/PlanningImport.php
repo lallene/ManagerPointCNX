@@ -43,8 +43,8 @@ public function collection(Collection $rows)
                 'jour' => $jour,
             ],
             [
-                'heure_debut' => $heureDebut,
-                'heure_fin' => $heureFin,
+                'entree' => $heureDebut,
+                'sortie' => $heureFin,
                 'semaine' => Carbon::parse($jour)->isoWeek(),
                 'Commentaire' => $commentaire,
                 'user_id' => Auth::id(),

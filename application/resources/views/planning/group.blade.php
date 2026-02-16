@@ -3,7 +3,13 @@
 <meta http-equiv="Content-Language" content="fr">
 <style>
     @media (min-width: 1400px) {
-        .container, .container-lg, .container-md, .container-sm, .container-xl, .container-xxl {
+
+        .container,
+        .container-lg,
+        .container-md,
+        .container-sm,
+        .container-xl,
+        .container-xxl {
             max-width: 1392px !important;
         }
     }
@@ -11,13 +17,16 @@
     /* Style global tableau */
     .table {
         border-collapse: separate !important;
-        border-spacing: 0 8px; /* espace vertical entre lignes */
+        border-spacing: 0 8px;
+        /* espace vertical entre lignes */
     }
 
     /* En-tête tableau */
     .table thead th {
-        background-color: #cfe2ff; /* bleu clair bootstrap */
-        color: #084298; /* bleu foncé */
+        background-color: #cfe2ff;
+        /* bleu clair bootstrap */
+        color: #084298;
+        /* bleu foncé */
         font-weight: 700;
         vertical-align: middle;
         text-align: center;
@@ -82,6 +91,7 @@
         border-radius: 6px;
         transition: background-color 0.25s ease;
     }
+
     .btn-sm:hover {
         filter: brightness(0.9);
     }
@@ -103,73 +113,75 @@
 
 
 @section('content')
-<div class="container-fluid">
-<h2 class="mb-4 text-center styled-title"></h2>
-<div class="row">
-        <div class="col-md-12">
-            <div class="column_title">
-                <h2>🗓️ Planning Hebdomadaire - Groupe d'agents</h2>
-                <div class="breadcrumb-custom d-none d-md-block">
-                    <span>ManagerPoint</span> / <span>Planning Hebdomadaire - Groupe d'agents</span>
+    <div class="container-fluid">
+        <h2 class="mb-4 text-center styled-title"></h2>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="column_title">
+                    <h2>🗓️ Planning Hebdomadaire - Groupe d'agents</h2>
+                    <div class="breadcrumb-custom d-none d-md-block">
+                        <span>ManagerPoint</span> / <span>Planning Hebdomadaire - Groupe d'agents</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    {{-- Grille de sélection des semaines --}}
-    <div class="d-flex flex-wrap justify-content-center mb-4">
-        @foreach ($semaines as $semaine)
-            <form method="GET" action="{{ route('planning.group') }}" class="me-2 mb-2">
-                <input type="hidden" name="week" value="{{ $semaine['numero'] }}">
-                <button type="submit" class="btn btn-sm {{ $selectedWeek == $semaine['numero'] ? 'btn-primary' : 'btn-outline-info' }} fw-bold shadow-sm">
-                    S{{ $semaine['numero'] }}<br>
-                    <small>{{ $semaine['debut'] }} - {{ $semaine['fin'] }}</small>
-                </button>
-            </form>
-        @endforeach
-    </div>
+        {{-- Grille de sélection des semaines --}}
+        <div class="d-flex flex-wrap justify-content-center mb-4">
+            @foreach ($semaines as $semaine)
+                <form method="GET" action="{{ route('planning.group') }}" class="me-2 mb-2">
+                    <input type="hidden" name="week" value="{{ $semaine['numero'] }}">
+                    <button type="submit"
+                        class="btn btn-sm {{ $selectedWeek == $semaine['numero'] ? 'btn-primary' : 'btn-outline-info' }} fw-bold shadow-sm">
+                        S{{ $semaine['numero'] }}<br>
+                        <small>{{ $semaine['debut'] }} - {{ $semaine['fin'] }}</small>
+                    </button>
+                </form>
+            @endforeach
+        </div>
 
-    {{-- Tableau de planning --}}
-    <div class="table-responsive">
-        <table class="table table-bordered table-sm align-middle table-hover">
-            <thead class="table-info text-center">
-                <tr>
-                    <th>Agent</th>
-                    @foreach ($dates as $date)
-                        @php
-                            $jour = \Carbon\Carbon::parse($date)->locale('fr_FR')->isoFormat('dddd');
-                        @endphp
-                        <th>
-                            {{ ucfirst($jour) }}<br>
-                            <small>{{ \Carbon\Carbon::parse($date)->format('d/m') }}</small>
-                        </th>
-                    @endforeach
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($agents as $agent)
+        {{-- Tableau de planning --}}
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle table-hover">
+                <thead class="table-info text-center">
                     <tr>
-                        <td>{{ $agent->nom }} {{ $agent->prenom }}</td>
+                        <th>Agent</th>
                         @foreach ($dates as $date)
                             @php
-                                $jourDate = \Carbon\Carbon::parse($date)->format('Y-m-d');
-                                $key = $agent->id . '-' . $jourDate;
-                                $planning = $plannings->get($key);
-                                $planning = $planning ? $planning->first() : null;
+                                $jour = \Carbon\Carbon::parse($date)->locale('fr_FR')->isoFormat('dddd');
                             @endphp
-                            <td class="text-center" style="min-width: 140px;">
-                                @if ($planning)
-
-                                    <span class="badge bg-success">🕓 {{\Carbon\Carbon::parse($planning->heure_debut)->format('H:i')}} - {{ \Carbon\Carbon::parse($planning->heure_fin)->format('H:i') }}</span>
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
-                            </td>
+                            <th>
+                                {{ ucfirst($jour) }}<br>
+                                <small>{{ \Carbon\Carbon::parse($date)->format('d/m') }}</small>
+                            </th>
                         @endforeach
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach ($agents as $agent)
+                        <tr>
+                            <td>{{ $agent->nom }} {{ $agent->prenom }}</td>
+                            @foreach ($dates as $date)
+                                @php
+                                    $jourDate = \Carbon\Carbon::parse($date)->format('Y-m-d');
+                                    $key = $agent->id . '-' . $jourDate;
+                                    $planning = $plannings->get($key);
+                                    $planning = $planning ? $planning->first() : null;
+                                @endphp
+                                <td class="text-center" style="min-width: 140px;">
+                                    @if ($planning)
+                                        <span class="badge bg-success">🕓
+                                            {{ \Carbon\Carbon::parse($planning->entree)->format('H:i') }} -
+                                            {{ \Carbon\Carbon::parse($planning->sortie)->format('H:i') }}</span>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 @endsection

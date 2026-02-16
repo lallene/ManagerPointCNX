@@ -1,5 +1,5 @@
 <?php
-
+ini_set('memory_limit', '512M');
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 
@@ -53,3 +53,4 @@ $response = $kernel->handle(
 )->send();
 
 $kernel->terminate($request, $response);
+

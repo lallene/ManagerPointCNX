@@ -2,241 +2,191 @@
 
 @section('content')
     <style>
-        /* Arrière-plan avec design entreprise */
-       body {
-    background: url('https://www.transparenttextures.com/patterns/cubes.png'), #f2f6fc;
-    background-size: cover;
-    background-repeat: repeat;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
+        body {
+            background: url('https://www.transparenttextures.com/patterns/cubes.png'), #f2f6fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-.container {
-    background-color: rgba(255, 255, 255, 0.95);
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* Nouveau style de titre */
-h3.page-title {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #004085;
-    text-align: center;
-    position: relative;
-    margin-bottom: 2rem;
-}
-h3.page-title::after {
-    content: "";
-    display: block;
-    width: 60px;
-    height: 4px;
-    background-color: #007bff;
-    margin: 10px auto 0;
-    border-radius: 2px;
-}
-
-
-        /* Conteneur principal */
         .container-custom {
             background-color: white;
             border-radius: 12px;
             padding: 40px 30px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.08);
-            margin-top: 100px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-top: 60px;
+            margin-bottom: 40px;
         }
 
-        /* Titres */
-        h2, h3 {
-            font-family: 'Roboto', sans-serif;
-            font-weight: 700;
-            color: #0056b3;
-            text-align: center;
+        .inline-notification {
+            margin-top: 15px;
+            margin-bottom: 20px;
         }
 
-        h3 {
-            font-size: 2rem;
-            margin-bottom: 2rem;
-        }
 
-        h2 {
-            font-size: 1.5rem;
-            margin-top: 3rem;
-        }
-
-        /* Formulaire */
-        .form-group label {
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-
-        .form-control,
-        .form-select {
+        .shift-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 12px 20px;
             border-radius: 8px;
-            font-size: 0.95rem;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
         }
 
-        button.btn-success {
+        .btn-record {
             font-weight: 600;
-            padding: 10px 22px;
-            font-size: 0.95rem;
             border-radius: 8px;
-            background-color: #198754;
+            height: 45px;
+            background-color: #2ecc71;
             border: none;
-            transition: all 0.2s ease-in-out;
+            color: white;
         }
 
-        button.btn-success:hover {
-            background-color: #146c43;
+        .btn-record:hover {
+            background-color: #27ae60;
         }
 
-        /* Tableau */
-        table.table-bordered th,
-        table.table-bordered td {
-            text-align: center;
-            vertical-align: middle;
-            font-size: 0.9rem;
-        }
-
-        table.table-bordered th {
-            background-color: #f0f2f5;
-            font-weight: 600;
-        }
-
-        table.table-bordered tbody tr:nth-child(even) {
-            background-color: #f9fafb;
-        }
-
-        table.table-bordered tbody tr:hover {
-            background-color: #e9f5ff;
-        }
-
-        /* Alertes */
-        .alert-danger ul {
-            margin-bottom: 0;
-        }
-
-        .alert-danger li {
-            font-size: 0.9rem;
-        }
-
-        /* Responsive */
-        @media screen and (max-width: 768px) {
-            .form-group {
-                width: 100% !important;
-            }
+        .form-label {
+            color: #6c757d;
+            font-size: 0.75rem;
+            font-weight: 700;
         }
     </style>
 
-    {{-- Google Font --}}
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-<div class="container container-custom">
-    @if ($planningDisponible->isEmpty())
-           <div style="
-        background-color: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeeba;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 20px 0;
-        font-size: 16px;
-    ">
-        <strong>Attention :</strong> Vous n'avez pas été planifié pour aujourd'hui.
-    </div>
-    @else
-
-
-        <h3 class="mb-4">📌 Interface de Pointage — Employé {{ Auth::user()->name }}</h3>
-
-        <form action="{{ route('pointages.store') }}" method="POST" class="d-flex align-items-center gap-3 flex-wrap">
-            @csrf
-
-            {{-- Semaine --}}
-            <div class="form-group flex-grow-1" style="min-width: 120px;">
-                <label for="semaine" class="form-label">Semaine</label>
-                <input type="number" name="semaine" id="semaine" class="form-control"
-                    value="{{ $currentWeek }}" readonly>
+    <div class="container container-custom">
+        {{-- Entête --}}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="column_title d-flex align-items-center">
+                <div class="me-3" style="width: 5px; height: 40px; background-color: #2ecc71; border-radius: 10px;"></div>
+                <h2 class="mb-0">📌 Interface de Pointage</h2>
             </div>
+            <div class="text-muted small">ManagerPoint / Pointage Quotidien</div>
+        </div>
 
-            {{-- Date --}}
-            <div class="form-group flex-grow-1" style="min-width: 150px;">
-                <label for="date" class="form-label">Date</label>
-                <input type="date" name="date" id="date" class="form-control"
-                    value="{{ $currentDate }}" readonly>
+        {{-- Notifications --}}
+        <div class="inline-notification">
+            @if (session('success'))
+                <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm" role="alert">
+                    <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
+            @if (session('error') || $errors->any())
+                <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i> {{ session('error') ?: 'Une erreur est survenue.' }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+        </div>
+
+        @if (!$planningDisponible)
+            <div class="alert alert-warning border-0 shadow-sm py-4 text-center">
+                <i class="fas fa-calendar-times fa-2x mb-3 text-warning"></i>
+                <p class="mb-0 fw-bold">Aucun planning prévu pour aujourd'hui. Pointage impossible.</p>
             </div>
-
-            {{-- Heure --}}
-            <div class="form-group flex-grow-1" style="min-width: 120px;">
-                <label for="heure" class="form-label">Heure</label>
-                <input type="time" name="heure" id="heure" class="form-control"
-                    value="{{ $currentTime }}" readonly>
-            </div>
-
-            {{-- Action --}}
-            <div class="form-group flex-grow-1" style="min-width: 180px;">
-                <label for="action" class="form-label">Action</label>
-                <select name="action" id="action" class="form-select" required>
-                    <option value="" disabled selected>-- Choisir une action --</option>
-                    @php
-                        $actions = [
-                            'debut' => 'Début de shift',
-                            'debutpause' => 'Début Pause',
-                            'finpause' => 'Fin Pause',
-                            'fin' => 'Fin de shift',
-                        ];
-                    @endphp
-                    @foreach ($actions as $val => $label)
-                        <option value="{{ $val }}" {{ $val !== $prochaineAction ? 'disabled' : '' }}>
-                            {{ $label }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Bouton submit --}}
-            <div class="form-group align-self-end">
-                <button type="submit" class="btn btn-success" @if (!$planningDisponible) disabled @endif>
-                    Enregistrer
-                </button>
-            </div>
-        </form>
-
-        {{-- Historique des pointages du jour --}}
-        <h2>Historique du jour ({{ \Carbon\Carbon::parse($currentDate)->translatedFormat('d F Y') }})</h2>
-
-        @if($pointagesDuJour->isEmpty())
-            <p class="text-muted text-center">Aucun pointage enregistré aujourd'hui.</p>
         @else
-            <table class="table table-sm table-bordered mt-3">
-                <thead>
-                    <tr>
-                        <th>Heure</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($pointagesDuJour as $pointage)
-                        <tr>
-                            <td>{{ \Carbon\Carbon::parse($pointage->heure)->format('H:i') }}</td>
-                            <td>{{ ucfirst($pointage->motif) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @endif
-
-        {{-- Affichage des erreurs --}}
-        @if ($errors->any())
-            <div class="alert alert-danger mt-4">
-                <ul class="mb-0">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+            {{-- Info Agent & Shift --}}
+            <div class="shift-info d-flex justify-content-between align-items-center shadow-sm">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-user-circle me-2 text-primary fa-lg"></i>
+                    <span>Agent : <strong>{{ Auth::user()->name }}</strong> | Prévu :
+                        <strong>{{ \Carbon\Carbon::parse($planningDisponible->entree)->format('H:i') }} –
+                            {{ \Carbon\Carbon::parse($planningDisponible->sortie)->format('H:i') }}</strong></span>
+                </div>
+                <span class="badge bg-primary px-3">SEMAINE {{ $currentWeek }}</span>
             </div>
+
+            {{-- Formulaire --}}
+            <div class="bg-light p-4 rounded-3 mb-5">
+                <form action="{{ route('pointages.store') }}" method="POST" class="row g-3 align-items-end">
+                    @csrf
+                    <div class="col-md-4">
+                        <label class="form-label">DATE</label>
+                        <input type="text" class="form-control border-0"
+                            value="{{ \Carbon\Carbon::parse($currentDate)->translatedFormat('d F Y') }}" readonly>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">HEURE ACTUELLE</label>
+                        <input type="text" class="form-control border-0 fw-bold text-primary" value="{{ $currentTime }}"
+                            readonly>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label text-uppercase">Action</label>
+                        <select name="action" id="action" class="form-select border-primary fw-bold" required>
+                            @php
+                                $actions = [
+                                    'debut' => '▶️ Démarrer mon shift',
+                                    'debutpause' => '☕ Partir en pause',
+                                    'finpause' => '🔙 Revenir de pause',
+                                    'fin' => '🏁 Terminer mon shift',
+                                ];
+                            @endphp
+                            @if ($prochaineAction == 'termine')
+                                <option value="" selected disabled>✅ Journée terminée</option>
+                            @else
+                                @foreach ($actions as $val => $label)
+                                    <option value="{{ $val }}"
+                                        {{ $val == $prochaineAction ? 'selected' : 'disabled' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            @endif
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-record w-100 shadow-sm"
+                            @if ($prochaineAction == 'termine') disabled @endif>
+                            Enregistrer
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {{-- Historique --}}
+            <div class="d-flex align-items-center mb-3 text-secondary">
+                <i class="fas fa-history me-2"></i>
+                <h6 class="mb-0 fw-bold text-uppercase" style="letter-spacing: 1px;">Aujourd'hui</h6>
+            </div>
+
+            {{-- Changement ici : on utilise $pointageDuJour --}}
+            @if (!$pointageDuJour)
+                <div class="text-center p-5 border rounded-3 bg-white shadow-sm">
+                    <p class="text-muted mb-0">En attente du premier pointage...</p>
+                </div>
+            @else
+                <div class="table-responsive">
+                    <table
+                        class="table table-hover table-bordered bg-white shadow-sm text-center align-middle rounded-3 overflow-hidden">
+                        <thead class="table-light">
+                            <tr class="small text-uppercase text-muted">
+                                <th>Entrée</th>
+                                <th>Début Pause</th>
+                                <th>Fin Pause</th>
+                                <th>Sortie</th>
+                                <th class="table-info text-dark">Total Travail</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-bold text-success">
+                                    {{ $pointageDuJour->entree ? \Carbon\Carbon::parse($pointageDuJour->entree)->format('H:i') : '--:--' }}
+                                </td>
+                                <td>{{ $pointageDuJour->pause_debut ? \Carbon\Carbon::parse($pointageDuJour->pause_debut)->format('H:i') : '--:--' }}
+                                </td>
+                                <td>{{ $pointageDuJour->pause_fin ? \Carbon\Carbon::parse($pointageDuJour->pause_fin)->format('H:i') : '--:--' }}
+                                </td>
+                                <td class="fw-bold text-danger">
+                                    {{ $pointageDuJour->sortie && $pointageDuJour->sortie != '00:00:00' ? \Carbon\Carbon::parse($pointageDuJour->sortie)->format('H:i') : '--:--' }}
+                                </td>
+                                <td class="table-info fw-bold" style="font-size: 1.1rem;">
+                                    {{ $pointageDuJour->temps_formatte }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         @endif
-
     </div>
-@endif
-
 @endsection

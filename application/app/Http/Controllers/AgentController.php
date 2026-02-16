@@ -66,7 +66,7 @@ class AgentController extends Controller
     public function store(Request $request)
 {
     $roleMapping = [
-          "DIRECTEUR D'ACTIVITE" => 9,
+        "DIRECTEUR D'ACTIVITE" => 9,
         "DIRECTEUR RH FILIALE" => 2,
         "HR BUSINESS PARTNER" => 2,
         'SUPERVISEUR SENIOR' => 9,
@@ -119,7 +119,7 @@ class AgentController extends Controller
                     'projet_id' => $request['projet_id'],
                     'nom' => $request['nom'],
                     'prenom' => $request['prenom'],
-                    'email' => $request['email'] ?? null,
+                    'work_email' => $request['work_email'] ?? null,
                     'fonction' => $request['fonction'] ?? null,
                     'manager' => $request['workday_id_manager'] ?? null,
                 ]);
@@ -134,10 +134,10 @@ class AgentController extends Controller
             }
 
             // Créer le User si non existant
-            if (!empty($request['email']) && !\App\Models\User::where('email', $request['email'])->exists()) {
+            if (!empty($request['work_email']) && !\App\Models\User::where('work_email', $request['work_email'])->exists()) {
                 $user = \App\Models\User::create([
                     'name' => $request['prenom'] . ' ' . $request['nom'],
-                    'email' => $request['email'],
+                    'work_email' => $request['work_email'],
                     'password' => \Hash::make($request['workday_id']),
                     'password_first_connection' => true,
                 ]);
@@ -146,7 +146,7 @@ class AgentController extends Controller
                 if (isset($roleMapping[$fonction])) {
                     $user->assignRole($roleMapping[$fonction]);
                     Log::info('User created with role:', [
-                        'email' => $user->email,
+                        'work_email' => $user->work_email,
                         'role_id' => $roleMapping[$fonction],
                     ]);
                 }
@@ -251,26 +251,6 @@ class AgentController extends Controller
             ->with('success', "Collaborateur retiré avec succes");
     }
 
-    public function getAgentByIris(Request $request){
-        $iris = $request->input('id');
-        $agent = Agent::where('iris', '=', $iris)->get();
-
-        $array = array();
-
-        foreach ($agent as $i) {
-            $item = Agent::find($i->id);
-            $array['Id'] = $item->id;
-            $array['Nom'] = $item->nom;
-            $array['Prenom'] = $item->prenom;
-            $array['Sexe'] = ($item->sexe == 'M') ? 'Masculin' : 'Feminin';
-            $array['DateEmbauche'] = $item->dateembauche;
-            $array['Projet'] = $item->Projet->designation;
-            $array['Fonction'] = $item->SousFonction->Fonction->intitule;
-            $array['Emploi'] = $item->Emploi->designation;
-        }
-
-        return json_encode($array);
-    }
 
     public function import (Request $req){
 
@@ -281,36 +261,35 @@ class AgentController extends Controller
         $dateInsertion=   Carbon::now()->format('d/m/Y');
 
 
-
     return redirect()->route('effectifs')->with('success','Les  collaborateurs ont bien été enregistrés.');
     }
 
     public function agents()
-{
-    $agents = DB::table('agents')
-    ->select ('id', 'nom', 'prenom', 'workday_id', 'email', 'fonction', 'manager')->get();
-    return response()->json($agents);
-}
-public function liste()
-{
-    $agents = DB::table('agents')
-        ->join('projets', 'agents.projet_id', '=', 'projets.id')
-        ->leftJoin('agents as managers', 'agents.manager', '=', 'managers.workday_id')
-        ->whereNotNull('agents.workday_id')
-        ->select(
-            'agents.id as id',
-            'projets.site_id as site',
-            'agents.workday_id',
-            'agents.nom',
-            'agents.prenom',
-            'agents.fonction',
-            'agents.email',
-            'projets.designation as projet',
-            DB::raw("COALESCE(CONCAT(managers.prenom, ' ', managers.nom), agents.manager) as manager_nom")
-        )
-        ;
+        {
+            $agents = DB::table('agents')
+            ->select ('id', 'nom', 'prenom', 'workday_id', 'work_email', 'fonction', 'manager')->get();
+            return response()->json($agents);
+        }
+        
+    public function liste()
+        {
+            $agents = DB::table('agents')
+                ->join('projets', 'agents.projet_id', '=', 'projets.id')
+                ->leftJoin('agents as managers', 'agents.manager', '=', 'managers.workday_id')
+                ->whereNotNull('agents.workday_id')
+                ->select(
+                    'agents.id as id',
+                    'projets.site_id as site',
+                    'agents.workday_id',
+                    'agents.nom',
+                    'agents.prenom',
+                    'agents.fonction',
+                    'agents.work_email',
+                    'projets.designation as projet',
+                    DB::raw("COALESCE(CONCAT(managers.prenom, ' ', managers.nom), agents.manager) as manager_nom")
+                )
+                ;
 
-    //dd($agents->get());
     return view($this->templatePath . '.liste', [
         'titre' => 'Liste des collaborateurs',
         'agents' => $agents,
@@ -332,7 +311,7 @@ public function ajax()
             'agents.nom',
             'agents.prenom',
             'agents.fonction',
-            'agents.email',
+            'agents.work_email',
             'projets.designation as projet',
             DB::raw("COALESCE(CONCAT(managers.prenom, ' ', managers.nom), agents.manager) as manager_nom")
         );

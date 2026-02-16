@@ -14,8 +14,8 @@
         </div>
 
         <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" name="email" id="email" class="form-control" value="{{ old('email', $user->email) }}" required>
+            <label for="work_email">Email</label>
+            <input type="email" name="work_email" id="work_email" class="form-control" value="{{ old('work_email', $user->work_email) }}" required>
         </div>
 
         <div class="form-group">
