@@ -365,6 +365,25 @@
 
     <script>
         $(document).ready(function() {
+            // Définition de la traduction en local (évite l'erreur CORS)
+            const frTranslation = {
+                "emptyTable": "Aucune donnée disponible dans le tableau",
+                "info": "Affichage de _START_ à _END_ sur _TOTAL_ entrées",
+                "infoEmpty": "Affichage de 0 à 0 sur 0 entrées",
+                "infoFiltered": "(filtré de _MAX_ entrées au total)",
+                "lengthMenu": "Afficher _MENU_ entrées",
+                "loadingRecords": "Chargement...",
+                "processing": "Traitement...",
+                "search": "Rechercher :",
+                "zeroRecords": "Aucun élément correspondant trouvé",
+                "paginate": {
+                    "first": "Premier",
+                    "last": "Dernier",
+                    "next": "Suivant",
+                    "previous": "Précédent"
+                }
+            };
+
             const commonConfig = {
                 dom: 'Bfrtip',
                 buttons: [{
@@ -372,14 +391,13 @@
                     text: '<i class="fas fa-file-csv me-1"></i> CSV',
                     className: 'btn btn-success btn-sm mb-3 rounded-pill'
                 }],
-                language: {
-                    url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json"
-                }
+                language: frTranslation // On utilise l'objet local ici
             };
 
             $('#tableProjets').DataTable(Object.assign({}, commonConfig, {
                 pageLength: 10
             }));
+
             $('#tableAudit').DataTable(Object.assign({}, commonConfig, {
                 order: [
                     [1, 'desc']

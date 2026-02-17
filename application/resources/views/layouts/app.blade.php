@@ -192,22 +192,41 @@
                             @endhasanyrole
 
                             {{-- Effectifs pour IT, RH et tous les grades Managers --}}
-                            @hasanyrole('IT|RH|Manager|Top Manager|Directeur')
+                            @hasanyrole('IT|RH|Top Manager|Directeur')
                                 <li class="nav-item"><a class="nav-link @routeActive('effectifs')"
                                         href="{{ route('effectifs') }}">Effectifs</a></li>
                             @endhasanyrole
 
                             {{-- Planification pour ceux qui gèrent des équipes --}}
-                            @hasanyrole('Manager|Top Manager')
+                            @role('Top Manager')
                                 <li class="nav-item"><a class="nav-link @routeActive('planification')"
                                         href="{{ route('planification') }}">Planification</a></li>
-                            @endhasanyrole
+                            @endrole
 
-                            {{-- Public / Tous --}}
-                            <li class="nav-item"><a class="nav-link @routeActive('planning.global')"
-                                    href="{{ route('planning.global') }}">Plannings</a></li>
+
+                            @role('Manager')
+                                <li class="nav-item"><a class="nav-link @routeActive('planning.global')"
+                                        href="{{ route('planning.global') }}">Plannings</a></li>
+                                <li class="nav-item"><a class="nav-link @routeActive('pointage.create')"
+                                        href="{{ route('pointage.create') }}">Check-in</a></li>
+                            @endrole
+
                             <li class="nav-item"><a class="nav-link @routeActive('pointage.index')"
                                     href="{{ route('pointage.index') }}">Pointages</a></li>
+
+                            {{-- Administration : Uniquement IT --}}
+                            @hasanyrole('IT|RH|Top Manager|Directeur')
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle @routeActive('permission.*|users.*')" href="#"
+                                        data-bs-toggle="dropdown">Plannings</a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ route('planning.daily') }}"><i
+                                                    class="fas fa-key me-2"></i> Planning Journalier & KPI</a></li>
+                                        <li><a class="dropdown-item" href="{{ route('planning.global') }}"><i
+                                                    class="fas fa-users-cog me-2"></i> Planning Global</a></li>
+                                    </ul>
+                                </li>
+                            @endhasanyrole
 
                             {{-- Administration : Uniquement IT --}}
                             @role('IT')

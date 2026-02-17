@@ -88,6 +88,13 @@
             padding: 50px;
             text-align: center;
         }
+
+        select:disabled {
+            background-color: #f2f2f2 !important;
+            color: #6c757d !important;
+            border: 1px solid #dee2e6 !important;
+            cursor: not-allowed;
+        }
     </style>
 
     <div class="container-fluid py-4">
@@ -102,24 +109,50 @@
             </div>
         </div>
 
-        <div class="card shadow-sm border-0 mb-4">
+        {{-- CARTE DES FILTRES (Identifiée pour ne pas disparaître) --}}
+        <div class="card shadow-sm border-0 mb-4" id="filter-card">
             <div class="card-body">
+                {{-- Debug temporaire : à supprimer une fois validé --}}
+                @if (auth()->user()->hasRole('manager'))
+                @endif
+
                 <form id="filter-form" class="row g-3 align-items-end">
+                    @php
+                        $isManager = auth()->user()->hasRole('manager');
+                        // On s'assure que les variables existent pour éviter les erreurs
+$currentSite = $selectedSite ?? (auth()->user()->agent->site->designation ?? '');
+$currentProjet = $selectedProjet ?? (auth()->user()->agent->projet_id ?? '');
+                    @endphp
+
                     <div class="col-md-2">
                         <label class="form-label fw-bold small text-muted">SITE</label>
-                        <select name="site_id" id="site_id" class="form-select shadow-sm">
+                        <select name="site_id" id="site_id" class="form-select shadow-sm"
+                            {{ $isManager ? 'disabled' : '' }}>
                             <option value="">Tous les sites</option>
                             @foreach ($sites as $site)
-                                <option value="{{ $site }}">{{ $site }}</option>
+                                <option value="{{ $site }}" {{ $currentSite == $site ? 'selected' : '' }}>
+                                    {{ $site }}
+                                </option>
                             @endforeach
                         </select>
+                        @if ($isManager)
+                            <input type="hidden" name="site_id" value="{{ $currentSite }}">
+                        @endif
                     </div>
 
                     <div class="col-md-2">
                         <label class="form-label fw-bold small text-muted">PROJET</label>
-                        <select name="projet_id" id="projet_id" class="form-select shadow-sm">
+                        <select name="projet_id" id="projet_id" class="form-select shadow-sm"
+                            {{ $isManager ? 'disabled' : '' }}>
                             <option value="">Tous les projets</option>
+                            {{-- Si c'est un manager, on peut pré-remplir l'option --}}
+                            @if ($isManager && isset($projet_nom))
+                                <option value="{{ $currentProjet }}" selected>{{ $projet_nom }}</option>
+                            @endif
                         </select>
+                        @if ($isManager)
+                            <input type="hidden" name="projet_id" value="{{ $currentProjet }}">
+                        @endif
                     </div>
 
                     <div class="col-md-6">
@@ -163,6 +196,7 @@
             <p class="mt-2 fw-bold">Synchronisation en cours...</p>
         </div>
 
+        {{-- CONTENEUR DE RÉSULTATS --}}
         <div id="table-container"></div>
     </div>
 @endsection
@@ -173,13 +207,17 @@
             // Chargement initial
             loadData();
 
-            // 1. Recherche rapide (temps réel)
+            // 1. RECHERCHE RAPIDE CORRIGÉE (Ne cache plus les filtres)
             $('#quick-search').on('input', function() {
                 const value = $(this).val().toLowerCase();
+
+                // On filtre les lignes
                 $("#table-container table tbody tr").each(function() {
                     $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
                 });
-                $('.card').each(function() {
+
+                // On cache les cartes de résultats vides SANS toucher au formulaire
+                $("#table-container .result-card").each(function() {
                     $(this).toggle($(this).find('tbody tr:visible').length > 0);
                 });
             });
@@ -203,11 +241,9 @@
                 });
             });
 
-            // 3. Événements de rafraîchissement
             $('#btn-refresh').on('click', loadData);
             $('.btn-week, #site_id, #projet_id').on('change', loadData);
 
-            // 4. Fonction de chargement AJAX
             function loadData() {
                 $('#loader').show();
                 $('#table-container').css('opacity', '0.5');
@@ -222,7 +258,6 @@
                     $('#loader').hide();
                     $('#table-container').css('opacity', '1');
                     renderTables(data);
-                    // Réapplique le filtre si nécessaire
                     $('#quick-search').trigger('input');
                 }).fail(function() {
                     $('#loader').hide();
@@ -232,7 +267,7 @@
                 });
             }
 
-            // 5. Moteur de rendu des tableaux (Correction SyntaxError)
+            // 3. MOTEUR DE RENDU OPTIMISÉ
             function renderTables(data) {
                 const container = $('#table-container');
                 if (!data.resultat || data.resultat.length === 0) {
@@ -244,7 +279,6 @@
 
                 let finalHtml = '';
                 data.resultat.forEach(proj => {
-                    // Construction headers dates
                     let dateHeaders = '';
                     let subHeaders = '';
                     data.dates.forEach(d => {
@@ -254,10 +288,9 @@
                         });
                         dateHeaders +=
                             `<th colspan="3" class="text-center border-start table-secondary">${label}</th>`;
-                        subHeaders += `
-                            <th class="text-center small border-start bg-light text-muted">Prévu</th>
-                            <th class="text-center small bg-light text-success">IN</th>
-                            <th class="text-center small bg-light text-danger">OUT</th>`;
+                        subHeaders += `<th class="text-center small border-start bg-light text-muted">Prévu</th>
+                                       <th class="text-center small bg-light text-success">IN</th>
+                                       <th class="text-center small bg-light text-danger">OUT</th>`;
                     });
 
                     let rows = '';
@@ -278,18 +311,18 @@
                                 `<td class="text-center border-start">${p}</td><td class="text-center">${i}</td><td class="text-center">${o}</td>`;
                         });
 
-                        rows += `
-                            <tr>
-                                <td class="fw-bold">
-                                    <div class="text-uppercase small">${agent.nom}</div>
-                                    <span class="bg-soft-primary small" style="font-size:0.65rem">${agent.fonction || 'MANAGER'}</span>
-                                </td>
-                                ${cells}
-                            </tr>`;
+                        rows += `<tr>
+                                    <td class="fw-bold">
+                                        <div class="text-uppercase small">${agent.nom}</div>
+                                        <span class="bg-soft-primary small" style="font-size:0.65rem">${agent.fonction || 'MANAGER'}</span>
+                                    </td>
+                                    ${cells}
+                                 </tr>`;
                     });
 
+                    // AJOUT de la classe .result-card pour l'isolation de la recherche
                     finalHtml += `
-                        <div class="card shadow-sm border-0 mb-5">
+                        <div class="card result-card shadow-sm border-0 mb-5">
                             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0 fw-bold text-primary"><i class="fas fa-folder me-2"></i>${proj.projet}</h5>
                                 <span class="badge bg-primary rounded-pill">${proj.superviseurs.length} Collaborateurs</span>

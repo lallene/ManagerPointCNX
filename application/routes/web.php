@@ -95,3 +95,15 @@ Route::get('/forgot-password', function () {
 })->name('password.request');
 
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
+
+
+
+Route::middleware(['auth'])->group(function () {
+
+    Route::get('/planning/journalier', [PlanningController::class, 'dailyView'])
+        ->name('planning.daily');
+
+    Route::get('/api/planning/daily-data', [PlanningController::class, 'getDailyPlanningData'])
+        ->name('getDailyPlanningData');
+
+});

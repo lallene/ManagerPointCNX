@@ -237,4 +237,204 @@ class PlanningController extends Controller
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
+
+
+    public function dailyView(Request $request): View
+{
+    $user = auth()->user();
+    
+    // Droits d'accès Full
+    $fullAccessRoles = ['IT', 'RH', 'Directeur', 'Top Manager'];
+    $hasFullAccess = $user->hasAnyRole($fullAccessRoles) || ($user->work_email === 'admin@concentrix.com');
+
+    // Récupération des sites
+    $sites = Projet::distinct()->whereNotNull('site_id')->pluck('site_id');
+
+    // Initialisation des filtres selon le rôle
+    if ($hasFullAccess) {
+        $selectedSiteId = $request->input('site_id', $sites->first());
+        $projets = Projet::when($selectedSiteId, fn($q) => $q->where('site_id', $selectedSiteId))->get();
+        $selectedProjetId = $request->input('projet_id');
+    } else {
+        // Restriction pour les managers : uniquement leur projet
+        $agentConnecte = Agent::with('projets')->where('work_email', $user->work_email)->first();
+        $projets = $agentConnecte ? $agentConnecte->projets : collect();
+        $selectedSiteId = $agentConnecte->site_id ?? null;
+        $selectedProjetId = $projets->first()->id ?? null;
+    }
+
+    return view('planning.daily', [
+        'sites'            => $sites,
+        'projetsList'      => $projets,
+        'selectedSiteId'   => $selectedSiteId,
+        'selectedProjetId' => $selectedProjetId,
+        'filtreFixe'       => !$hasFullAccess // Utilisé pour désactiver les selects en Blade
+    ]);
+}
+
+public function getDailyPlanningData(Request $request): JsonResponse
+{
+    try {
+        $date = $request->get('date', Carbon::today()->format('Y-m-d'));
+        $siteId = $request->get('site_id');
+        $projetId = $request->get('projet_id');
+
+        $PAUSE_NORMAL = 60;   // minutes
+        $TOLERANCE = 5;       // minutes
+
+        $projets = Projet::when($siteId, fn($q) => $q->where('site_id', $siteId))
+            ->when($projetId, fn($q) => $q->where('id', $projetId))
+            ->get();
+
+        $resultat = [];
+
+        foreach ($projets as $projet) {
+
+            $allManagers = Agent::whereHas('projets', fn($q) =>
+                $q->where('projets.id', $projet->id)
+            )->get();
+
+            $topManagersGroups = [];
+
+            foreach ($allManagers as $manager) {
+
+                $boss = Agent::where('workday_id', $manager->manager)->first();
+                $topManagerName = $boss
+                    ? "{$boss->prenom} {$boss->nom}"
+                    : "Direction / Hors Groupe";
+
+                $pointage = DB::table('pointages')
+                    ->where('agent_id', $manager->id)
+                    ->whereDate('date_pointage', $date)
+                    ->first();
+
+                if (!$pointage) continue;
+
+                if (!isset($topManagersGroups[$topManagerName])) {
+                    $topManagersGroups[$topManagerName] = [
+                        'top_manager' => $topManagerName,
+                        'managers' => []
+                    ];
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ANALYSE PAUSE
+                |--------------------------------------------------------------------------
+                */
+                $pauseMinutes = 0;
+                $pauseStatus = null;
+
+                if ($pointage->pause_debut && $pointage->pause_fin) {
+                    $pauseStart = Carbon::parse($pointage->pause_debut);
+                    $pauseEnd   = Carbon::parse($pointage->pause_fin);
+
+                    $pauseMinutes = $pauseStart->diffInMinutes($pauseEnd);
+
+                    if ($pauseMinutes > ($PAUSE_NORMAL + $TOLERANCE)) {
+                        $pauseStatus = 'DEPASSEMENT';
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ANALYSE RETARD DÉBUT
+                |--------------------------------------------------------------------------
+                */
+                $startStatus = null;
+
+                if ($pointage->entree) {
+                    $realStart = Carbon::parse($pointage->entree);
+
+                    // Exemple : shift prévu 06:00
+                    $shiftStart = Carbon::parse($date . ' 06:00');
+
+                    if ($realStart->gt($shiftStart->copy()->addMinutes($TOLERANCE))) {
+                        $startStatus = 'RETARD';
+                    }
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ANALYSE DÉPART ANTICIPÉ
+                |--------------------------------------------------------------------------
+                */
+                $endStatus = null;
+
+                if ($pointage->sortie) {
+                    $realEnd = Carbon::parse($pointage->sortie);
+
+                    // Exemple : fin prévue 18:00
+                    $shiftEnd = Carbon::parse($date . ' 18:00');
+
+                    if ($realEnd->lt($shiftEnd)) {
+                        $endStatus = 'DEPART_ANTICIPE';
+                    }
+                }
+
+                $topManagersGroups[$topManagerName]['managers'][] = [
+                    'nom' => "{$manager->prenom} {$manager->nom}",
+                    'role' => $manager->fonction ?? 'Manager',
+                    'is_connected' => $manager->last_seen >= now()->subMinutes(10),
+                    'real_start' => $pointage->entree
+                        ? Carbon::parse($pointage->entree)->format('H:i')
+                        : null,
+
+                    'segments' => $this->calculateWorkSegments(
+                        $pointage->entree,
+                        $pointage->sortie,
+                        $pointage->pause_debut,
+                        $pointage->pause_fin
+                    ),
+
+                    'pauses' => ($pointage->pause_debut && $pointage->pause_fin)
+                        ? [[
+                            'start' => Carbon::parse($pointage->pause_debut)->format('H:i'),
+                            'end' => Carbon::parse($pointage->pause_fin)->format('H:i'),
+                            'minutes' => $pauseMinutes,
+                            'status' => $pauseStatus
+                        ]]
+                        : [],
+
+                    'start_status' => $startStatus,
+                    'end_status'   => $endStatus
+                ];
+            }
+
+            if (!empty($topManagersGroups)) {
+                $resultat[] = [
+                    'site' => $projet->site_id,
+                    'projet' => $projet->designation,
+                    'top_managers' => array_values($topManagersGroups)
+                ];
+            }
+        }
+
+        return response()->json($resultat);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+
+/**
+ * Logique de découpage des blocs de travail
+ */
+private function calculateWorkSegments($in, $out, $pDebut, $pFin)
+{
+    $segments = [];
+    $start = Carbon::parse($in)->format('H:i');
+    $end = Carbon::parse($out)->format('H:i');
+
+    if ($pDebut && $pFin) {
+        // Bloc 1 : Avant pause
+        $segments[] = ['start' => $start, 'end' => Carbon::parse($pDebut)->format('H:i')];
+        // Bloc 2 : Après pause
+        $segments[] = ['start' => Carbon::parse($pFin)->format('H:i'), 'end' => $end];
+    } else {
+        $segments[] = ['start' => $start, 'end' => $end];
+    }
+    return $segments;
+}
 }

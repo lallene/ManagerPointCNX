@@ -97,7 +97,7 @@
 
             {{-- Formulaire --}}
             <div class="bg-light p-4 rounded-3 mb-5">
-                <form action="{{ route('pointages.store') }}" method="POST" class="row g-3 align-items-end">
+                <form action="{{ route('pointage.store') }}" method="POST" class="row g-3 align-items-end">
                     @csrf
                     <div class="col-md-4">
                         <label class="form-label">DATE</label>
