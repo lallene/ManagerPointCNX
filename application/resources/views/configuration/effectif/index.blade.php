@@ -38,7 +38,6 @@
             display: block;
         }
 
-        /* Style spécifique pour le bouton modèle */
         .btn-template {
             color: #198754;
             background-color: #eafaf1;
@@ -60,7 +59,6 @@
                 <div class="column_title">
                     <h2>{{ $titre }}</h2>
                     <div class="breadcrumb-custom">
-                        {{-- Bouton pour télécharger le masque Excel --}}
                         <a href="{{ asset('templates/masque_import_agents.xlsx') }}"
                             class="btn btn-template btn-sm px-3 shadow-sm">
                             <i class="fas fa-download me-2"></i> Télécharger le modèle Excel
@@ -97,7 +95,6 @@
             </div>
 
             <div class="card-body p-4">
-                {{-- Table DataTables identique à ton code précédent --}}
                 <div class="table-responsive">
                     <table id="agentTable" class="table table-hover w-100">
                         <thead>
@@ -120,7 +117,6 @@
 @endsection
 
 @push('scripts')
-    {{-- Utilisation de Bootstrap 5 pour DataTables pour la cohérence --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 
@@ -129,115 +125,118 @@
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    @push('scripts')
+        <script>
+            $(document).ready(function() {
+                // 1. Définition de la configuration de langue pour réutilisation
+                const dataTableLanguage = {
+                    url: "{{ asset('js/datatables/fr-FR.json') }}"
+                };
 
-    <script>
-        $(document).ready(function() {
-            // Sécurité : Destruction de l'instance existante
-            if ($.fn.DataTable.isDataTable('#agentTable')) {
-                $('#agentTable').DataTable().destroy();
-            }
-
-            const table = $('#agentTable').DataTable({
-                processing: true,
-                serverSide: true,
-                ajax: {
-                    url: "{{ route('effectif.ajax') }}",
-                    type: "GET",
-                    error: function(xhr) {
-                        console.error("Erreur DataTables:", xhr.responseText);
-                    }
-                },
-                columns: [{
-                        data: 'site',
-                        name: 'site', // Lié au filterColumn du contrôleur
-                        orderable: false,
-                        searchable: true
-                    },
-                    {
-                        data: 'workday_id',
-                        name: 'workday_id'
-                    },
-                    {
-                        data: 'nom', // On simplifie le data pour le tri natif
-                        name: 'nom',
-                        render: function(data, type, row) {
-                            if (!row.nom) return '-';
-                            const firstPrenom = row.prenom ? row.prenom.split(' ')[0] : '';
-                            return `<strong class="text-dark">${row.nom}</strong> ${firstPrenom}`;
-                        }
-                    },
-                    {
-                        data: 'fonction',
-                        name: 'fonction'
-                    },
-                    {
-                        data: 'work_email',
-                        name: 'work_email'
-                    },
-                    {
-                        data: 'projet',
-                        name: 'projet', // Lié au filterColumn via table pivot
-                        orderable: false,
-                        searchable: true
-                    },
-                    {
-                        data: 'manager_nom',
-                        name: 'manager' // On pointe vers la colonne physique pour le tri/recherche
-                    },
-                    {
-                        data: null,
-                        orderable: false,
-                        searchable: false,
-                        className: 'text-center',
-                        render: function(data, type, row) {
-                            const editUrl = `{{ url('effectif') }}/${row.id}/edit`;
-                            const deleteUrl = `{{ url('effectif') }}/${row.id}`;
-
-                            return `
-                            <div class="btn-group shadow-sm">
-                                <a href="${editUrl}" class="btn btn-outline-primary btn-sm" title="Modifier">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <button type="button" class="btn btn-outline-danger btn-sm" 
-                                        onclick="confirmDelete('${deleteUrl}', '${row.nom}')" title="Supprimer">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        `;
-                        }
-                    }
-                ],
-                dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
-                buttons: [{
-                        extend: 'excel',
-                        className: 'btn btn-success btn-sm',
-                        text: '<i class="fas fa-file-excel me-1"></i> Excel'
-                    },
-                    {
-                        extend: 'pdf',
-                        className: 'btn btn-danger btn-sm',
-                        text: '<i class="fas fa-file-pdf me-1"></i> PDF'
-                    }
-                ],
-                pageLength: 50,
-                order: [
-                    [2, 'asc']
-                ], // Tri par nom par défaut
-                language: {
-                    "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json" // Traduction complète officielle
+                // 2. Gestion de l'instance existante
+                if ($.fn.DataTable.isDataTable('#agentTable')) {
+                    $('#agentTable').DataTable().destroy();
                 }
-            });
-        });
 
-        function confirmDelete(url, name) {
-            if (confirm(`Voulez-vous vraiment supprimer l'agent ${name} ?`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = url;
-                form.innerHTML = `@csrf @method('DELETE')`;
-                document.body.appendChild(form);
-                form.submit();
+                // 3. Initialisation
+                $('#agentTable').DataTable({
+                    processing: true,
+                    serverSide: true,
+                    ajax: {
+                        url: "{{ route('effectif.ajax') }}",
+                        type: "GET",
+                        error: function(xhr) {
+                            console.error("Erreur DataTables:", xhr.responseText);
+                        }
+                    },
+                    columns: [{
+                            data: 'site',
+                            name: 'site',
+                            orderable: false,
+                            searchable: true
+                        },
+                        {
+                            data: 'workday_id',
+                            name: 'workday_id'
+                        },
+                        {
+                            data: 'nom',
+                            name: 'nom',
+                            render: function(data, type, row) {
+                                if (!row.nom) return '-';
+                                const firstPrenom = row.prenom ? row.prenom.split(' ')[0] : '';
+                                return `<strong class="text-dark">${row.nom}</strong> ${firstPrenom}`;
+                            }
+                        },
+                        {
+                            data: 'fonction',
+                            name: 'fonction'
+                        },
+                        {
+                            data: 'work_email',
+                            name: 'work_email'
+                        },
+                        {
+                            data: 'projet',
+                            name: 'projet',
+                            orderable: false,
+                            searchable: true
+                        },
+                        {
+                            data: 'manager_nom',
+                            name: 'manager'
+                        },
+                        {
+                            data: null,
+                            orderable: false,
+                            searchable: false,
+                            className: 'text-center',
+                            render: function(data, type, row) {
+                                const editUrl = `{{ url('effectif') }}/${row.id}/edit`;
+                                const deleteUrl = `{{ url('effectif') }}/${row.id}`;
+                                return `
+                                <div class="btn-group shadow-sm">
+                                    <a href="${editUrl}" class="btn btn-outline-primary btn-sm" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" 
+                                            onclick="confirmDelete('${deleteUrl}', '${row.nom}')" title="Supprimer">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>`;
+                            }
+                        }
+                    ],
+                    dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
+                    buttons: [{
+                            extend: 'excel',
+                            className: 'btn btn-success btn-sm',
+                            text: '<i class="fas fa-file-excel me-1"></i> Excel'
+                        },
+                        {
+                            extend: 'pdf',
+                            className: 'btn btn-danger btn-sm',
+                            text: '<i class="fas fa-file-pdf me-1"></i> PDF'
+                        }
+                    ],
+                    pageLength: 50,
+                    order: [
+                        [2, 'asc']
+                    ],
+                    language: dataTableLanguage // Application de la traduction française
+                });
+            });
+
+            function confirmDelete(url, name) {
+                if (confirm(`Voulez-vous vraiment supprimer l'agent ${name} ?`)) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = url;
+                    form.innerHTML = `@csrf @method('DELETE')`;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
             }
-        }
-    </script>
+        </script>
+    @endpush
 @endpush

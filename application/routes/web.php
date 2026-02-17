@@ -21,6 +21,21 @@ Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+
+Route::group(['prefix' => 'configuration/projet', 'as' => 'projet.'], function () {
+    
+    // 1. PLACE TOUJOURS LES ROUTES STATIQUES EN PREMIER
+    Route::get('/ajax', [ProjetController::class, 'ajax'])->name('ajax');
+    Route::get('/', [ProjetController::class, 'index'])->name('index');
+    Route::get('/create', [ProjetController::class, 'create'])->name('create');
+    Route::post('/store', [ProjetController::class, 'store'])->name('store');
+
+    // 2. PLACE LES ROUTES AVEC PARAMÈTRES {projet} EN DERNIER
+    Route::get('/{projet}/edit', [ProjetController::class, 'edit'])->name('edit');
+    Route::put('/{projet}', [ProjetController::class, 'update'])->name('update');
+    Route::delete('/{projet}', [ProjetController::class, 'destroy'])->name('destroy');
+});
+
 // --- ROUTES SOUS AUTHENTIFICATION ---
 Route::middleware(['auth'])->group(function () {
 
@@ -82,7 +97,6 @@ Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function 
     
     // Projets & Sites
     Route::resource('projet', ProjetController::class)->except(['show']);
-    Route::get('projet-ajax', [ProjetController::class, 'ajax'])->name('projets.ajax');
     Route::resource('site', SiteController::class)->except(['show']);
     
     // Utilisateurs
@@ -107,3 +121,5 @@ Route::middleware(['auth'])->group(function () {
         ->name('getDailyPlanningData');
 
 });
+
+

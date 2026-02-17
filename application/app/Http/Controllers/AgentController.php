@@ -157,40 +157,49 @@ class AgentController extends Controller
      */
     public function ajax(Request $request)
 {
-    // 1. Eager Loading des projets pour la performance (évite le problème N+1)
-    $query = Agent::with('projets')->select('agents.*');
+    // 1. Eager Loading groupé pour éviter le problème N+1 sur les projets ET le manager
+    $query = Agent::with(['projets', 'supervisor'])->select('agents.*');
 
     return DataTables::of($query)
-        // Affichage des projets (badge HTML pour plus de clarté)
+        // Colonne PROJET (badges HTML)
         ->addColumn('projet', function($agent) {
             if ($agent->projets->isEmpty()) {
                 return '<span class="badge bg-light text-muted">Aucun projet</span>';
             }
-            
             return $agent->projets->map(function($p) {
                 return '<span class="badge bg-info text-dark" style="font-size: 0.75rem;">' . e($p->designation) . '</span>';
             })->implode(' ');
         })
 
-        // Affichage des sites uniques
+        // Colonne SITE
         ->addColumn('site', function($agent) {
+            // On récupère les noms des sites via les projets
             $sites = $agent->projets->pluck('site_id')->unique();
             return $sites->isEmpty() ? '-' : $sites->implode(', ');
         })
 
-        // Nom du manager (On peut aussi faire une relation Agent -> Manager ici)
+        // Colonne MANAGER (Nom complet)
         ->addColumn('manager_nom', function($agent) {
-            return $agent->manager ?? 'Direction';
+            if ($agent->supervisor) {
+                return e($agent->supervisor->prenom . ' ' . $agent->supervisor->nom);
+            }
+            return '<span class="badge bg-secondary">Direction</span>';
         })
 
-        // 2. RENDRE LA COLONNE "PROJET" RECHERCHABLE
+        // 2. FILTRAGE PERSONNALISÉ (Pour les colonnes calculées/pivot)
         ->filterColumn('projet', function($query, $keyword) {
             $query->whereHas('projets', function($q) use ($keyword) {
                 $q->where('designation', 'like', "%{$keyword}%");
             });
         })
+        
+        // 3. ACTIONS (Si nécessaire)
+        ->addColumn('action', function($agent) {
+            return '<button class="btn btn-sm btn-primary"><i class="fa fa-eye"></i></button>';
+        })
 
-        ->rawColumns(['projet', 'site']) 
+        // On déclare toutes les colonnes contenant du HTML
+        ->rawColumns(['projet', 'manager_nom', 'action']) 
         ->make(true);
 }
     /**
@@ -206,6 +215,8 @@ class AgentController extends Controller
     }
     public function import(Request $req): RedirectResponse
     {
+
+       
         $req->validate(['agent_file' => 'required|mimes:xlsx,xls,csv']);
         Excel::import(new AgentsImport, $req->file('agent_file'));
         return redirect()->route('effectifs')->with('success', 'Importation terminée.');

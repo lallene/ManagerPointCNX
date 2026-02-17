@@ -16,10 +16,7 @@ class CreateUsersTable extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            
-            // On ajoute ->index() car tu fais des jointures SQL dessus dans UtilisateurController::ajax
             $table->string('work_email')->unique()->index(); 
-            
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             

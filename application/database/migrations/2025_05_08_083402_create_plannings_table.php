@@ -18,10 +18,9 @@ class CreatePlanningsTable extends Migration
             $table->date('jour')->index();
             $table->time('entree');
             $table->time('sortie');
-            $table->integer('semaine')->index(); // Indexé pour les filtres de Dashboard
-            
+            $table->string('semaine', 10);
             $table->foreignId('agent_id')->constrained('agents')->onDelete('cascade');
-            $table->foreignId('user_id')->constrained('users'); // Qui a créé le planning
+            $table->foreignId('user_id')->constrained('users'); 
             $table->timestamps();
         });
     }

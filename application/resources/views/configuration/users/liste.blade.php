@@ -111,7 +111,6 @@
                                 <th>Fonction</th>
                                 <th>Rôle</th>
                                 <th>Projet</th>
-                                <th>Site</th>
                                 <th class="text-center">Action</th>
                             </tr>
                         </thead>
@@ -180,11 +179,7 @@
                         name: 'projet_nom', // Correspond au addColumn('projet_nom')
                         orderable: false
                     },
-                    {
-                        data: 'site_nom',
-                        name: 'site_nom', // Correspond au addColumn('site_nom')
-                        orderable: false
-                    },
+
                     {
                         data: 'action',
                         name: 'action',

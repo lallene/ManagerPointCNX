@@ -88,39 +88,56 @@ class ProjetController extends Controller
         return back()->with('success', 'Importation réussie.');
     }
 
+
     public function ajax()
-    {
-        $query = DB::table('projets')
-            ->join('sites', 'projets.site_id', '=', 'sites.id')
-            ->select([
-                'projets.id as projet_id',
-                'projets.msa_id',
-                'projets.designation',
-                'sites.designation as site_nom',
-                'projets.dltsuperviseur',
-            ]);
+{
+    // Construction de la requête avec Left Join pour ne perdre aucun projet
+    $query = DB::table('projets')
+        ->leftJoin('sites', 'projets.site_id', '=', 'sites.id')
+        ->select([
+            'projets.id as projet_id',
+            'projets.msa_id',
+            'projets.designation as projet_nom',
+            'sites.designation as site_nom',
+            'projets.dltsuperviseur',
+        ]);
 
-        return DataTables::of($query)
-            ->filterColumn('site_nom', function($query, $keyword) {
-                $query->where('sites.designation', 'like', "%{$keyword}%");
-            })
-            ->addColumn('action', function ($row) {
-                $edit = route('projet.edit', $row->projet_id);
-                $delete = route('projet.destroy', $row->projet_id);
-                $token = csrf_token();
+    return DataTables::of($query)
+        // 1. Filtrage sur la colonne jointe
+        ->filterColumn('site_nom', function($query, $keyword) {
+            $query->where('sites.designation', 'like', "%{$keyword}%");
+        })
 
-                return <<<HTML
-                    <div class="btn-group">
-                        <a href="{$edit}" class="btn btn-sm btn-primary"><i class="fa fa-edit"></i></a>
-                        <form action="{$delete}" method="POST" style="display:inline-block;" onsubmit="return confirm('Supprimer ce projet ?')">
-                            <input type="hidden" name="_token" value="{$token}">
-                            <input type="hidden" name="_method" value="DELETE">
-                            <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
-                        </form>
-                    </div>
+        // 2. Gestion de l'affichage du site (Badge si NULL)
+        ->editColumn('site_nom', function($row) {
+            return $row->site_nom ?? '<span class="badge bg-danger">Sans site</span>';
+        })
+
+        // 3. Génération des boutons d'action
+        ->addColumn('action', function ($row) {
+            $edit = route('projet.edit', $row->projet_id);
+            $delete = route('projet.destroy', $row->projet_id);
+            $token = csrf_token();
+
+            return <<<HTML
+                <div class="btn-group shadow-sm">
+                    <a href="{$edit}" class="btn btn-sm btn-outline-primary" title="Modifier">
+                        <i class="fa fa-edit"></i>
+                    </a>
+                    <form action="{$delete}" method="POST" class="d-inline" onsubmit="return confirm('Confirmer la suppression ?')">
+                        <input type="hidden" name="_token" value="{$token}">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
 HTML;
-            })
-            ->rawColumns(['action'])
-            ->make(true);
-    }
+        })
+        
+        // 4. Paramètres DataTables
+        ->rawColumns(['action', 'site_nom']) // On autorise le HTML pour ces colonnes
+        ->setRowId('projet_id') 
+        ->make(true);
+}
 }

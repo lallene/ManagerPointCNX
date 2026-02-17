@@ -21,7 +21,6 @@
                 $table->string('work_email')->unique()->index(); 
                 $table->string('fonction')->nullable();
                 $table->string('manager')->nullable(); 
-                $table->foreignId('projet_id')->constrained('projets')->onDelete('cascade');
 
             });
         }

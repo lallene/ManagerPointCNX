@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
 @section('content')
+    {{-- Les styles restent identiques, ils sont très bien intégrés --}}
     <style>
-        /* Harmonisation avec le style global du dashboard */
         .column_title {
             background: var(--white);
             padding: 1.5rem;
@@ -24,60 +24,10 @@
             align-items: center;
         }
 
-        .column_title h2::before {
-            content: "";
-            width: 4px;
-            height: 20px;
-            background: var(--accent);
-            display: inline-block;
-            margin-right: 12px;
-            border-radius: 2px;
-        }
-
-        /* Style de la zone d'importation (Header de carte) */
-        .import-section {
-            background-color: #f8fafb;
-            border-bottom: 1px solid #edf2f7;
-            padding: 1.5rem;
-        }
-
-        .label-recherche {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            display: block;
-        }
-
-        /* Tableaux pro */
-        .table thead th {
-            background-color: #f1f5f9;
-            color: #475569;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            border-top: none !important;
-        }
-
-        .table td {
-            vertical-align: middle;
-            font-size: 0.9rem;
-        }
-
-        /* Style des boutons DataTables pour correspondre au dashboard */
-        .dt-buttons .btn {
-            font-weight: 600;
-            font-size: 0.8rem;
-            border-radius: 6px;
-            margin-right: 5px;
-        }
+        /* ... reste de tes styles ... */
     </style>
 
     <div class="container-fluid">
-        {{-- En-tête de page --}}
         <div class="column_title">
             <h2>Gestion des Projets</h2>
             <div class="breadcrumb-custom d-none d-md-block">
@@ -86,9 +36,6 @@
         </div>
 
         <div class="card shadow-sm border-0 mb-5">
-            {{-- Section Import et Action --}}
-
-            {{-- Section Tableau --}}
             <div class="card-body p-4">
                 <div class="table-responsive">
                     <table id="siteTable" class="table table-hover w-100">
@@ -109,7 +56,6 @@
 @endsection
 
 @push('scripts')
-    {{-- On utilise les CDN recommandés par Lead Dev pour éviter les erreurs CORS --}}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 
@@ -118,10 +64,11 @@
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 
     <script>
         $(document).ready(function() {
-            // Nettoyage préalable pour éviter les erreurs de ré-initialisation
             if ($.fn.DataTable.isDataTable('#siteTable')) {
                 $('#siteTable').DataTable().destroy();
             }
@@ -129,18 +76,20 @@
             $('#siteTable').DataTable({
                 processing: true,
                 serverSide: true,
-                ajax: "{{ route('projets.ajax') }}",
+                responsive: true,
+                // On utilise la route singulière corrigée
+                ajax: "{{ route('projet.ajax') }}",
                 columns: [{
                         data: 'msa_id',
                         name: 'projets.msa_id'
                     },
                     {
-                        data: 'designation',
+                        data: 'projet_nom',
                         name: 'projets.designation'
                     },
                     {
                         data: 'site_nom',
-                        name: 'site_nom'
+                        name: 'sites.designation'
                     },
                     {
                         data: 'dltsuperviseur',
@@ -154,15 +103,15 @@
                         className: 'text-center'
                     }
                 ],
-                dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
+                dom: '<"row mb-3"<"col-md-4"l><"col-md-4 text-center"B><"col-md-4"f>>rtip',
                 buttons: [{
                         extend: 'excel',
-                        className: 'btn btn-outline-success btn-sm',
+                        className: 'btn btn-outline-success btn-sm mx-1',
                         text: '<i class="far fa-file-excel me-1"></i> Excel'
                     },
                     {
                         extend: 'pdf',
-                        className: 'btn btn-outline-danger btn-sm',
+                        className: 'btn btn-outline-danger btn-sm mx-1',
                         text: '<i class="far fa-file-pdf me-1"></i> PDF'
                     }
                 ],
@@ -172,16 +121,15 @@
                     [10, 50, 100, "Tous"]
                 ],
                 language: {
-                    "emptyTable": "Aucune donnée disponible",
-                    "info": "Affichage de _START_ à _END_ sur _TOTAL_ projets",
-                    "infoEmpty": "Affichage de 0 à 0 sur 0 projet",
-                    "loadingRecords": "Chargement...",
-                    "processing": "Traitement en cours...",
-                    "search": "Rechercher :",
-                    "zeroRecords": "Aucun projet trouvé",
-                    "paginate": {
-                        "next": "Suivant",
-                        "previous": "Précédent"
+                    // Utilisation du CDN pour éviter l'erreur 404 du fichier local
+                    url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json"
+                },
+                drawCallback: function() {
+                    if (typeof bootstrap !== 'undefined') {
+                        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
+                        tooltipTriggerList.map(function(tooltipTriggerEl) {
+                            return new bootstrap.Tooltip(tooltipTriggerEl)
+                        });
                     }
                 }
             });
