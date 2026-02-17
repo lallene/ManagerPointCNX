@@ -32,3 +32,30 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Répertoire de travail
 WORKDIR /var/www/application
+{
+"emptyTable": "Aucune donnée disponible dans le tableau",
+"loadingRecords": "Chargement...",
+"processing": "Traitement...",
+"select": {
+"rows": {
+"_": "%d lignes sélectionnées",
+"1": "1 ligne sélectionnée"
+}
+},
+"zeroRecords": "Aucun élément correspondant trouvé",
+"paginate": {
+"first": "Premier",
+"last": "Dernier",
+"next": "Suivant",
+"previous": "Précédent"
+},
+"aria": {
+"sortAscending": ": activer pour trier la colonne par ordre croissant",
+"sortDescending": ": activer pour trier la colonne par ordre décroissant"
+},
+"info": "Affichage de _START_ à _END_ sur _TOTAL_ entrées",
+"infoEmpty": "Affichage de 0 à 0 sur 0 entrées",
+"infoFiltered": "(filtré de _MAX_ entrées au total)",
+"search": "Rechercher :",
+"lengthMenu": "Afficher _MENU_ entrées"
+}
