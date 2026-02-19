@@ -2,67 +2,44 @@
 
 namespace App\Imports;
 
-
 use App\Models\Projet;
-use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Concerns\ToModel;
-use Maatwebsite\Excel\Concerns\SkipsOnError;
+use App\Models\Site;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithBatchInserts;
-use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Illuminate\Support\Collection;
 
-class ProjetsImport implements ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow, SkipsOnError
+class ProjetsImport implements ToCollection, WithHeadingRow
 {
-    /**
-    * @param array $row
-    *
-    * @return \Illuminate\Database\Eloquent\Model|null
-    */
-    public function model(array $row)
+    public function collection(Collection $rows)
     {
-        //dd($row);
-        $site= DB::table('sites')->where('designation', $row['site'])->first();
-        if ($site == null ){ $row['site'] = 1;}else{ $row['site'] = $site->id;};
-
-        $projet = DB::table('projets')->where('designation', $row['projetservice'])->first();
-
-        if ($projet == null){
-          //  dd($row, $row['projetservice'], $row['site']);
-            return new Projet([
-                'designation'=>$row['projetservice'],
-                'site_id'=>$row['site'],
-            ]);
-
-        }else{
-            $projet = Projet::where( 'designation' ,'=', $row['projetservice'])->first();
-            $projet->site_id = $row['projetservice'];
-
-            try{
-
-                $projet->save();
-
-            }catch (\Exception $e){
-                echo'e';
-                return redirect()->route('configuration.projet.liste');
+        foreach ($rows as $row) {
+            // 1. On vérifie si les colonnes critiques sont présentes
+            // Attention : On utilise 'site' car c'est le nom dans ton dump
+            if (empty($row['site']) || empty($row['designation'])) {
+                continue;
             }
 
+            // 2. Récupération propre de l'ID du site (on force l'entier)
+            $siteId = (int) $row['site'];
+
+            // 3. Sécurité : On vérifie si le site existe pour éviter une erreur SQL
+            if (!Site::where('id', $siteId)->exists()) {
+                // Optionnel : tu peux logger l'erreur ici
+                continue;
+            }
+
+            // 4. Update ou Create pour le Projet
+            Projet::updateOrCreate(
+                [
+                    'designation' => trim($row['designation']),
+                    'site_id'     => $siteId
+                ],
+                [
+                    'msa_id'         => $row['msa_id'] ?? null,
+                    // Attention à l'orthographe : 'dlt_superviseur' dans Excel vs 'dltsuperviseur' en BDD ?
+                    'dltsuperviseur' => $row['dlt_superviseur'] ?? null,
+                ]
+            );
         }
-
     }
-
-    public function batchSize(): int
-    {
-        return 1000;
-    }
-
-    public function chunkSize(): int
-    {
-        return 500;
-    }
-
-    public function onError(\Throwable $e)
-    {
-        // Handle the exception how you'd like.
-    }
-
 }

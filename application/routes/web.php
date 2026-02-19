@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController; // IMPORT MANQUANT
+use App\Http\Controllers\Auth\LoginController; 
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PermissionController;
@@ -12,7 +12,6 @@ use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UtilisateurController;
 
 
-// --- ROUTES PUBLIQUES ---
 Route::get('/', function () {
     return redirect()->route('login');
 });
@@ -24,40 +23,35 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::group(['prefix' => 'configuration/projet', 'as' => 'projet.'], function () {
     
-    // 1. PLACE TOUJOURS LES ROUTES STATIQUES EN PREMIER
     Route::get('/ajax', [ProjetController::class, 'ajax'])->name('ajax');
     Route::get('/', [ProjetController::class, 'index'])->name('index');
     Route::get('/create', [ProjetController::class, 'create'])->name('create');
     Route::post('/store', [ProjetController::class, 'store'])->name('store');
 
-    // 2. PLACE LES ROUTES AVEC PARAMÈTRES {projet} EN DERNIER
     Route::get('/{projet}/edit', [ProjetController::class, 'edit'])->name('edit');
     Route::put('/{projet}', [ProjetController::class, 'update'])->name('update');
     Route::delete('/{projet}', [ProjetController::class, 'destroy'])->name('destroy');
 });
 
-// --- ROUTES SOUS AUTHENTIFICATION ---
 Route::middleware(['auth'])->group(function () {
 
-    // Gestion du changement de mot de passe (Lié à ton LoginController)
     Route::get('/change-password', [LoginController::class, 'showChangePasswordForm'])->name('changePassword');
     Route::post('/update-password', [LoginController::class, 'updatePassword'])->name('updatePassword');
 
-    // Dashboard & Accueil
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Pointages
     Route::prefix('pointage')->group(function () {
         Route::get('/', [PointageController::class, 'index'])->name('pointage.index');
         Route::get('/create', [PointageController::class, 'create'])->name('pointage.create');
         Route::post('/store', [PointageController::class, 'store'])->name('pointage.store');
         Route::delete('/{pointage}', [PointageController::class, 'destroy'])->name('pointage.destroy');
-        Route::get('/pointages/api/data', [PointageController::class, 'getPointageData'])->name('pointages.global');
+        Route::get('/api/data', [PointageController::class, 'getPointageData'])->name('pointage.api.data');
         Route::get('/api/projets-by-site', [PointageController::class, 'getProjetsBySite'])->name('api.projets.by.site');
+        Route::get('/group', [PointageController::class, 'index'])->name('index');
+
     });
 
-    // Plannings
     Route::prefix('planning')->group(function () {
         Route::get('/', [PlanningController::class, 'index'])->name('planification');
         Route::get('/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
@@ -68,7 +62,6 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// --- ROUTES RH / IT / MANAGERS ---
 Route::middleware(['auth', 'role:RH|IT|Manager|Top Manager|Directeur'])->group(function () {
     Route::prefix('effectif')->group(function () {
         Route::get('/liste', [AgentController::class, 'index'])->name('effectifs'); 
@@ -82,10 +75,8 @@ Route::middleware(['auth', 'role:RH|IT|Manager|Top Manager|Directeur'])->group(f
     });
 });
 
-// --- ADMINISTRATION (IT SEULEMENT) ---
 Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function () {
     
-        // Dans web.php, à l'intérieur du groupe IT
     Route::resource('permissions', PermissionController::class)->names([
         'index' => 'permission.index',
         'create' => 'permission.create',
@@ -95,11 +86,10 @@ Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function 
         'destroy' => 'permission.destroy',
     ]);
     
-    // Projets & Sites
     Route::resource('projet', ProjetController::class)->except(['show']);
     Route::resource('site', SiteController::class)->except(['show']);
+    Route::post('/projet/import', [ProjetController::class, 'import'])->name('projet.import');
     
-    // Utilisateurs
     Route::get('/users/ajax', [UtilisateurController::class, 'ajax'])->name('users.ajax');
     Route::resource('users', UtilisateurController::class);
 });
@@ -119,6 +109,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/api/planning/daily-data', [PlanningController::class, 'getDailyPlanningData'])
         ->name('getDailyPlanningData');
+
+        Route::post('/planning/import', [PlanningController::class, 'import'])->name('plannings.import');
+        Route::post('/planning/store', [PlanningController::class, 'store'])->name('planning.store');
 
 });
 

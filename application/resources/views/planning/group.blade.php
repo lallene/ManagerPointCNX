@@ -103,20 +103,28 @@
         <div class="card shadow-sm mb-4 border-0">
             <div class="card-body p-3">
                 <form id="filter-form" class="row g-3 align-items-end">
+                    {{-- Filtre SITE --}}
                     <div class="col-md-3">
                         <label class="form-label fw-bold small text-muted">SITE</label>
-                        <select name="site_id" id="site_id" class="form-select" {{ $filtreFixe ? 'disabled' : '' }}>
-                            <option value="">Tous les sites</option>
+                        <select name="site_id" id="site_id" class="form-select">
+                            @if ($sites->count() > 1)
+                                <option value="">Tous mes sites</option>
+                            @endif
                             @foreach ($sites as $site)
                                 <option value="{{ $site }}" {{ $selectedSiteId == $site ? 'selected' : '' }}>
-                                    {{ $site }}</option>
+                                    {{ $site }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
+
+                    {{-- Filtre PROJET --}}
                     <div class="col-md-3">
                         <label class="form-label fw-bold small text-muted">PROJET</label>
-                        <select name="projet_id" id="projet_id" class="form-select" {{ $filtreFixe ? 'disabled' : '' }}>
-                            <option value="">Tous les projets</option>
+                        <select name="projet_id" id="projet_id" class="form-select">
+                            @if ($projetsList->count() > 1)
+                                <option value="">Tous mes projets</option>
+                            @endif
                             @foreach ($projetsList as $projet)
                                 <option value="{{ $projet->id }}"
                                     {{ $selectedProjetId == $projet->id ? 'selected' : '' }}>

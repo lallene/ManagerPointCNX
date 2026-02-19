@@ -55,4 +55,47 @@ class Planning extends Model
 
         return $this->hasOne(Pointage::class, 'agent_id', 'agent_id');
     }
+
+    public function store(Request $request)
+{
+    // 1. Validation des données entrantes
+    $request->validate([
+        'plannings' => 'required|array',
+        'week' => 'required'
+    ]);
+
+    $data = $request->input('plannings');
+
+    try {
+        foreach ($data as $agentId => $jours) {
+            foreach ($jours as $date => $heures) {
+                
+                // On n'enregistre que si au moins une heure est saisie
+                if (!empty($heures['entree']) || !empty($heures['sortie'])) {
+                    
+                    Planning::updateOrCreate(
+                        [
+                            'agent_id' => $agentId,
+                            'jour'     => $date,
+                        ],
+                        [
+                            'entree'   => $heures['entree'],
+                            'sortie'   => $heures['sortie'],
+                            'semaine'  => $request->input('week'), // Ex: 2026-08
+                            // 'updated_by' => auth()->id(), // Optionnel : pour le suivi
+                        ]
+                    );
+                }
+            }
+        }
+
+        return back()->with('success', 'Le planning de la semaine ' . $request->input('week') . ' a été enregistré avec succès.');
+
+    } catch (\Exception $e) {
+        // Log de l'erreur pour le debug en tant que Lead Dev
+        \Log::error("Erreur lors de l'enregistrement du planning : " . $e->getMessage());
+        
+        return back()->with('error', 'Une erreur est survenue lors de l\'enregistrement.');
+    }
+}
 }

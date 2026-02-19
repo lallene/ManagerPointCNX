@@ -2,118 +2,151 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\{Auth, Gate, Log};
-use App\Models\{Agent, Pointage, User, Planning, Projet};
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\{Auth, DB, Log};
+use App\Models\{Agent, Pointage, Planning, Projet, User};
+use Illuminate\Http\{Request, JsonResponse, RedirectResponse};
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
 
-
 class PointageController extends Controller
 {
-   
-
     /**
-     * Vue du tableau de bord des pointages.
+     * DASHBOARD : Vue du tableau de bord filtrée par périmètre.
      */
     public function index(): View
     {
-        $sites = Projet::select('site_id')->distinct()->pluck('site_id');
+        $user = Auth::user();
+        $isAdmin = ($user->work_email === 'admin@concentrix.com');
         
-        $semaines = [];
-        $semaineActuelle = now()->weekOfYear;
-        
-        // Génération de la plage de semaines (Standard 2026)
-        for ($i = $semaineActuelle - 3; $i <= $semaineActuelle + 3; $i++) {
-            if ($i < 1 || $i > 53) continue;
-            $start = now()->setISODate(now()->year, $i)->startOfWeek();
-            $semaines[] = [
-                'numero' => $i,
-                'debut'  => $start->format('d/m'),
-                'label'  => "Semaine $i"
-            ];
+        if ($isAdmin) {
+            // Admin voit tout
+            $sites = Projet::select('site_id')->distinct()->whereNotNull('site_id')->pluck('site_id');
+            $projetsList = Projet::orderBy('designation')->get();
+        } else {
+            // Manager ne voit que son périmètre
+            $agentConnecte = Agent::with('projets')->where('work_email', $user->work_email)->firstOrFail();
+            $sites = $agentConnecte->projets->pluck('site_id')->unique()->filter();
+            $projetsList = $agentConnecte->projets;
         }
 
         return view('pointages.group', [
             'sites' => $sites,
-            'semaines' => $semaines,
-            'selectedWeek' => $semaineActuelle,
-            'selectedSiteId' => null
+            'projetsList' => $projetsList,
+            'semaines' => $this->generateWeekRange(),
+            'selectedWeek' => now()->weekOfYear,
+            'isManager' => !$isAdmin
         ]);
     }
 
     /**
-     * Interface de pointage pour l'agent (Create).
+     * API AJAX : Données pour le tableau de comparaison (Planning vs Réel)
+     */
+    public function getPointageData(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $isAdmin = ($user->work_email === 'admin@concentrix.com');
+            
+            // 1. Définition des dates de la semaine
+            $weekNum = (int)$request->input('week', now()->weekOfYear);
+            $dateDebut = now()->setISODate(now()->year, $weekNum)->startOfWeek();
+            $dates = [];
+            for ($i = 0; $i < 7; $i++) { 
+                $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d'); 
+            }
+
+            // 2. Filtrage des projets autorisés
+            $projets = Projet::query()
+                ->when(!$isAdmin, function($q) use ($user) {
+                    $q->whereHas('agents', fn($a) => $a->where('work_email', $user->work_email));
+                })
+                ->when($request->site_id, fn($q) => $q->where('site_id', $request->site_id))
+                ->when($request->projet_id && $request->projet_id !== 'null', fn($q) => $q->where('id', $request->projet_id))
+                ->get();
+
+            // 3. Récupération des emails ayant le rôle 'Manager'
+            $managerEmails = DB::table('users')
+                ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
+                ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+                ->where('roles.name', 'Manager')
+                ->pluck('users.work_email')->toArray();
+
+            $resultat = [];
+            foreach ($projets as $projet) {
+                // Eager loading pour éviter le N+1
+                $agentsDuProjet = Agent::whereHas('projets', fn($q) => $q->where('projets.id', $projet->id))
+                    ->whereIn('work_email', $managerEmails)->get();
+
+                $superviseursData = [];
+                foreach ($agentsDuProjet as $agent) {
+                    $superviseursData[] = [
+                        'nom' => "{$agent->prenom} {$agent->nom}",
+                        'fonction' => $agent->fonction ?? 'MANAGER',
+                        'stats' => $this->mapStats($agent->id, $dates)
+                    ];
+                }
+
+                if (!empty($superviseursData)) {
+                    $resultat[] = ['projet' => $projet->designation, 'superviseurs' => $superviseursData];
+                }
+            }
+
+            return response()->json(['dates' => $dates, 'resultat' => $resultat]);
+        } catch (\Exception $e) {
+            Log::error("Erreur API Pointage Data: " . $e->getMessage());
+            return response()->json(['error' => "Erreur interne"], 500);
+        }
+    }
+
+    /**
+     * AGENT : Interface de pointage (Check-in/Check-out)
      */
     public function create(): View|RedirectResponse
     {
-        $now = now();
-        $currentDate = $now->toDateString();
         $user = Auth::user();
-
         $agent = Agent::where('work_email', $user->work_email)->first();
-        if (!$agent) {
-            return redirect()->back()->with('error', "Profil agent introuvable.");
-        }
+        if (!$agent) return redirect()->back()->with('error', "Profil agent introuvable.");
 
-        $planningDisponible = Planning::where('agent_id', $agent->id)
-            ->whereDate('jour', $currentDate)
-            ->first();
+        $today = now()->toDateString();
+        $planning = Planning::where('agent_id', $agent->id)->whereDate('jour', $today)->first();
+        $pointage = Pointage::where('agent_id', $agent->id)->whereDate('date_pointage', $today)->first();
 
-        $pointageExistant = Pointage::where('agent_id', $agent->id)
-            ->whereDate('date_pointage', $currentDate)
-            ->first();
-
-        // Logique d'état (State Machine)
+        // Machine à état pour les boutons
         $prochaineAction = 'debut'; 
-        if ($pointageExistant) {
-            if (!$pointageExistant->pause_debut) {
-                $prochaineAction = 'debutpause';
-            } elseif (!$pointageExistant->pause_fin) {
-                $prochaineAction = 'finpause';
-            } elseif (!$pointageExistant->sortie) {
-                $prochaineAction = 'fin';
-            } else {
-                $prochaineAction = 'termine'; 
-            }
+        if ($pointage) {
+            if (!$pointage->pause_debut) $prochaineAction = 'debutpause';
+            elseif (!$pointage->pause_fin) $prochaineAction = 'finpause';
+            elseif (!$pointage->sortie) $prochaineAction = 'fin';
+            else $prochaineAction = 'termine';
         }
 
         return view('pointages.create', [
-            'currentWeek'        => $now->weekOfYear,
-            'currentDate'        => $currentDate,
-            'currentTime'        => $now->format('H:i'),
-            'pointageDuJour'     => $pointageExistant,
-            'planningDisponible' => $planningDisponible,
-            'prochaineAction'    => $prochaineAction,
-            'agent'              => $agent
+            'currentWeek' => now()->weekOfYear,
+            'currentDate' => $today,
+            'currentTime' => now()->format('H:i'),
+            'pointageDuJour' => $pointage,
+            'planningDisponible' => $planning,
+            'prochaineAction' => $prochaineAction,
+            'agent' => $agent
         ]);
     }
 
     /**
-     * Enregistrement des actions de pointage (Store).
+     * STORE : Enregistre l'action de pointage
      */
     public function store(Request $request): RedirectResponse
     {
         $agent = Agent::where('work_email', Auth::user()->work_email)->first();
-        if (!$agent) return redirect()->back()->with('error', "Profil agent non lié.");
+        if (!$agent) return redirect()->back()->with('error', "Profil non lié.");
 
         $now = now();
         $today = $now->toDateString();
-        $currentTime = $now->toTimeString(); 
-        $currentWeekDB = $now->year . '-' . str_pad($now->weekOfYear, 2, '0', STR_PAD_LEFT);
-
-        $pointage = Pointage::where('agent_id', $agent->id)
-            ->whereDate('date_pointage', $today)
-            ->first();
-
+        $pointage = Pointage::where('agent_id', $agent->id)->whereDate('date_pointage', $today)->first();
         $action = $request->input('action');
 
         try {
             if ($action === 'debut') {
-                if ($pointage) return redirect()->back()->with('error', "Déjà pointé aujourd'hui.");
-
+                if ($pointage) return redirect()->back()->with('error', "Déjà pointé.");
                 $planning = Planning::where('agent_id', $agent->id)->whereDate('jour', $today)->first();
 
                 Pointage::create([
@@ -121,32 +154,27 @@ class PointageController extends Controller
                     'planning_id' => $planning?->id,
                     'user_id' => Auth::id(),
                     'date_pointage' => $today,
-                    'semaine' => $currentWeekDB,
-                    'entree' => $currentTime,
-                    'sortie' => null,
+                    'semaine' => $now->year . '-' . str_pad($now->weekOfYear, 2, '0', STR_PAD_LEFT),
+                    'entree' => $now->toTimeString(),
                     'minutes_travaillees' => 0
                 ]);
-
-                return redirect()->back()->with('success', "Entrée enregistrée à $currentTime.");
+                return redirect()->back()->with('success', "Entrée enregistrée.");
             }
 
             if (!$pointage) return redirect()->back()->with('error', "Aucun pointage actif.");
 
             $updateData = match($action) {
-                'debutpause' => ['pause_debut' => $currentTime],
-                'finpause'   => ['pause_fin' => $currentTime],
+                'debutpause' => ['pause_debut' => $now->toTimeString()],
+                'finpause'   => ['pause_fin' => $now->toTimeString()],
                 'fin'        => [
-                    'sortie' => $currentTime,
+                    'sortie' => $now->toTimeString(),
                     'minutes_travaillees' => $pointage->setRelation('agent', $agent)->calculerMinutesEffectives()
                 ],
-                default      => []
+                default => []
             };
 
-            if (!empty($updateData)) {
-                $pointage->update($updateData);
-            }
-
-            return redirect()->back()->with('success', "Action enregistrée !");
+            $pointage->update($updateData);
+            return redirect()->back()->with('success', "Action enregistrée.");
 
         } catch (\Exception $e) {
             Log::error("Erreur Pointage Store: " . $e->getMessage());
@@ -154,136 +182,51 @@ class PointageController extends Controller
         }
     }
 
-    
-    public function getPointageData(Request $request): JsonResponse
+    /**
+     * HELPERS
+     */
+    private function mapStats($agentId, $dates)
 {
-    try {
-        $user = Auth::user();
-        
-        $fullAccessRoles = ['IT', 'RH', 'Directeur', 'Top Manager'];
-        $hasFullAccess = $user->hasAnyRole($fullAccessRoles) || ($user->work_email === 'admin@concentrix.com');
-
-        // 1. Gestion des dates (Sécurisée)
-        $rawWeek = $request->input('week', now()->format('Y-W')); 
-        if (!str_contains($rawWeek, '-')) {
-            $year = (int)now()->year;
-            $weekNum = (int)$rawWeek;
-        } else {
-            $parts = explode('-', str_replace('-W', '-', $rawWeek));
-            $year = (int)$parts[0];
-            $weekNum = (int)($parts[1] ?? now()->weekOfYear);
-        }
-
-        $dateDebut = \Carbon\Carbon::now()->setISODate($year, $weekNum)->startOfWeek();
-        $dates = [];
-        for ($i = 0; $i < 7; $i++) {
-            $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d');
-        }
-
-        $managerEmails = \DB::table('users')
-            ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
-            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
-            ->where('roles.name', 'Manager')
-            ->pluck('users.work_email')
-            ->toArray();
-
-        // 2. Détermination des projets (Compatible Pivot)
-        if ($hasFullAccess) {
-            $selectedSiteId = $request->input('site_id');
-            $selectedProjetId = $request->input('projet_id');
-
-            $projets = \App\Models\Projet::when($selectedSiteId, fn($q) => $q->where('site_id', $selectedSiteId))
-                ->when($selectedProjetId && $selectedProjetId !== 'null', fn($q) => $q->where('id', $selectedProjetId))
-                ->get();
-        } else {
-            // Un utilisateur peut être lié à plusieurs projets
-            $agentConnecte = \App\Models\Agent::where('work_email', $user->work_email)->first();
-            $projets = $agentConnecte ? $agentConnecte->projets : collect();
-        }
-
-        // 3. Récupération des Agents Managers (Utilisation du Scope forProjet)
-        $projetIds = $projets->pluck('id');
-        
-        // On récupère tous les agents qui appartiennent à ces projets
-        $agentsManagers = \App\Models\Agent::whereHas('projets', function($q) use ($projetIds) {
-                $q->whereIn('projets.id', $projetIds);
-            })
-            ->whereIn('work_email', $managerEmails)
-            ->with('projets') // Eager loading pour éviter les requêtes en boucle
-            ->get();
-
-        $agentIds = $agentsManagers->pluck('id');
-
-        // 4. Plannings et Pointages
-        $allPlannings = \App\Models\Planning::whereIn('agent_id', $agentIds)
-            ->whereBetween('jour', [$dates[0], $dates[6]])
-            ->get()
-            ->groupBy('agent_id');
-
-        $allPointages = \DB::table('pointages')
-            ->whereIn('agent_id', $agentIds)
-            ->whereBetween('date_pointage', [$dates[0], $dates[6]])
-            ->get()
-            ->groupBy('agent_id');
-
-        $resultat = [];
-
-        foreach ($projets as $projet) {
-            $superviseurs = [];
-            
-            // Filtre les agents qui possèdent ce projet dans leur collection 'projets'
-            $agentsDuProjet = $agentsManagers->filter(function($agent) use ($projet) {
-                return $agent->projets->contains('id', $projet->id);
-            });
-
-            foreach ($agentsDuProjet as $agent) {
-                $stats = [];
-                $agentPlannings = $allPlannings->get($agent->id) ?? collect();
-                $agentPointages = $allPointages->get($agent->id) ?? collect();
-
-                foreach ($dates as $date) {
-                    $p = $agentPlannings->first(fn($v) => \Carbon\Carbon::parse($v->jour)->format('Y-m-d') === $date);
-                    $pt = $agentPointages->first(fn($v) => $v->date_pointage === $date);
-
-                    $stats[$date] = [
-                        'p_in'  => ($p && $p->entree) ? date('H:i', strtotime($p->entree)) : null,
-                        'p_out' => ($p && $p->sortie) ? date('H:i', strtotime($p->sortie)) : null,
-                        'a_in'  => ($pt && $pt->entree) ? date('H:i', strtotime($pt->entree)) : null,
-                        'a_out' => ($pt && $pt->sortie) ? date('H:i', strtotime($pt->sortie)) : null,
-                    ];
-                }
-
-                $superviseurs[] = [
-                    'nom'      => "{$agent->prenom} {$agent->nom}",
-                    'fonction' => $agent->fonction ?? 'MANAGER',
-                    'stats'    => $stats
-                ];
-            }
-
-            if (count($superviseurs) > 0) {
-                $resultat[] = [
-                    'projet'       => $projet->designation,
-                    'superviseurs' => $superviseurs
-                ];
-            }
-        }
-
-        return response()->json([
-            'dates'    => $dates,
-            'resultat' => $resultat
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error("Erreur Pointage : " . $e->getMessage());
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
-}
+    $stats = [];
     
+    // On force la clé en format string 'YYYY-MM-DD' pour correspondre exactement au tableau $dates
+    $plannings = Planning::where('agent_id', $agentId)
+        ->whereIn('jour', $dates)
+        ->get()
+        ->keyBy(function($item) {
+            return \Illuminate\Support\Carbon::parse($item->jour)->format('Y-m-d');
+        });
 
-    public function getProjetsBySite(Request $request): JsonResponse
-    {
-        $projets = Projet::where('site_id', $request->site_id)->orderBy('designation')->get();
-        return response()->json($projets);
+    $pointages = Pointage::where('agent_id', $agentId)
+        ->whereIn('date_pointage', $dates)
+        ->get()
+        ->keyBy(function($item) {
+            return \Illuminate\Support\Carbon::parse($item->date_pointage)->format('Y-m-d');
+        });
+
+    foreach ($dates as $date) {
+        $p = $plannings->get($date);
+        $pt = $pointages->get($date);
+
+        $stats[$date] = [
+            'p_in'  => $p && $p->entree ? Carbon::parse($p->entree)->format('H:i') : null,
+            'p_out' => $p && $p->sortie ? Carbon::parse($p->sortie)->format('H:i') : null,
+            'a_in'  => $pt && $pt->entree ? Carbon::parse($pt->entree)->format('H:i') : null,
+            'a_out' => $pt && $pt->sortie ? Carbon::parse($pt->sortie)->format('H:i') : null,
+        ];
     }
+    return $stats;
 }
 
+    private function generateWeekRange(): array
+    {
+        $semaines = [];
+        $current = now()->weekOfYear;
+        for ($i = $current - 3; $i <= $current + 3; $i++) {
+            if ($i < 1 || $i > 53) continue;
+            $start = now()->setISODate(now()->year, $i)->startOfWeek();
+            $semaines[] = ['numero' => $i, 'debut' => $start->format('d/m'), 'label' => "Semaine $i"];
+        }
+        return $semaines;
+    }
+}

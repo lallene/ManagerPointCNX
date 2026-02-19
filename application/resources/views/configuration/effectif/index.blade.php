@@ -114,46 +114,54 @@
             </div>
         </div>
     </div>
-@endsection
-
-@push('scripts')
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
-
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     @push('scripts')
+        {{-- Chargement des dépendances via CDN --}}
+        <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+        <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+        <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
         <script>
             $(document).ready(function() {
-                // 1. Définition de la configuration de langue pour réutilisation
+                // 1. Traduction française intégrée (évite la requête HTTP 404)
                 const dataTableLanguage = {
-                    url: "{{ asset('js/datatables/fr-FR.json') }}"
+                    "emptyTable": "Aucun agent trouvé",
+                    "info": "Affichage de _START_ à _END_ sur _TOTAL_ agents",
+                    "infoEmpty": "Affichage de 0 à 0 sur 0 entrées",
+                    "infoFiltered": "(filtré de _MAX_ agents)",
+                    "lengthMenu": "Afficher _MENU_ agents",
+                    "loadingRecords": "Chargement en cours...",
+                    "processing": "Traitement...",
+                    "search": "Rechercher :",
+                    "zeroRecords": "Aucun agent correspondant trouvé",
+                    "paginate": {
+                        "first": "Premier",
+                        "last": "Dernier",
+                        "next": "Suivant",
+                        "previous": "Précédent"
+                    }
                 };
 
-                // 2. Gestion de l'instance existante
-                if ($.fn.DataTable.isDataTable('#agentTable')) {
-                    $('#agentTable').DataTable().destroy();
-                }
-
-                // 3. Initialisation
-                $('#agentTable').DataTable({
+                // 2. Initialisation DataTables
+                const table = $('#agentTable').DataTable({
                     processing: true,
                     serverSide: true,
+                    responsive: true,
                     ajax: {
                         url: "{{ route('effectif.ajax') }}",
                         type: "GET",
                         error: function(xhr) {
-                            console.error("Erreur DataTables:", xhr.responseText);
+                            console.error("Erreur serveur : ", xhr.responseText);
                         }
                     },
                     columns: [{
                             data: 'site',
                             name: 'site',
-                            orderable: false,
-                            searchable: true
+                            orderable: false
                         },
                         {
                             data: 'workday_id',
@@ -163,9 +171,8 @@
                             data: 'nom',
                             name: 'nom',
                             render: function(data, type, row) {
-                                if (!row.nom) return '-';
-                                const firstPrenom = row.prenom ? row.prenom.split(' ')[0] : '';
-                                return `<strong class="text-dark">${row.nom}</strong> ${firstPrenom}`;
+                                const prenom = row.prenom ? row.prenom.split(' ')[0] : '';
+                                return `<span class="fw-bold text-dark">${data}</span> <span class="text-muted">${prenom}</span>`;
                             }
                         },
                         {
@@ -179,12 +186,13 @@
                         {
                             data: 'projet',
                             name: 'projet',
-                            orderable: false,
-                            searchable: true
+                            render: function(data) {
+                                return `<span class="badge bg-light text-primary border">${data}</span>`;
+                            }
                         },
                         {
                             data: 'manager_nom',
-                            name: 'manager'
+                            name: 'manager_nom'
                         },
                         {
                             data: null,
@@ -192,51 +200,49 @@
                             searchable: false,
                             className: 'text-center',
                             render: function(data, type, row) {
-                                const editUrl = `{{ url('effectif') }}/${row.id}/edit`;
-                                const deleteUrl = `{{ url('effectif') }}/${row.id}`;
                                 return `
-                                <div class="btn-group shadow-sm">
-                                    <a href="${editUrl}" class="btn btn-outline-primary btn-sm" title="Modifier">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" 
-                                            onclick="confirmDelete('${deleteUrl}', '${row.nom}')" title="Supprimer">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>`;
+                            <div class="btn-group shadow-sm">
+                                <a href="{{ url('effectif') }}/${row.id}/edit" class="btn btn-white btn-sm border" title="Modifier">
+                                    <i class="fas fa-edit text-primary"></i>
+                                </a>
+                                <button type="button" class="btn btn-white btn-sm border" 
+                                        onclick="confirmDelete('{{ url('effectif') }}/${row.id}', '${row.nom}')" title="Supprimer">
+                                    <i class="fas fa-trash text-danger"></i>
+                                </button>
+                            </div>`;
                             }
                         }
                     ],
                     dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
                     buttons: [{
                             extend: 'excel',
-                            className: 'btn btn-success btn-sm',
-                            text: '<i class="fas fa-file-excel me-1"></i> Excel'
+                            className: 'btn btn-outline-success btn-sm',
+                            text: '<i class="fas fa-file-excel"></i>'
                         },
                         {
                             extend: 'pdf',
-                            className: 'btn btn-danger btn-sm',
-                            text: '<i class="fas fa-file-pdf me-1"></i> PDF'
+                            className: 'btn btn-outline-danger btn-sm',
+                            text: '<i class="fas fa-file-pdf"></i>'
                         }
                     ],
-                    pageLength: 50,
-                    order: [
-                        [2, 'asc']
-                    ],
-                    language: dataTableLanguage // Application de la traduction française
+                    pageLength: 25,
+                    language: dataTableLanguage
                 });
             });
 
+            // 3. Fonction de suppression robuste
             function confirmDelete(url, name) {
-                if (confirm(`Voulez-vous vraiment supprimer l'agent ${name} ?`)) {
+                if (confirm(`⚠️ Supprimer définitivement l'agent ${name} ?`)) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url;
-                    form.innerHTML = `@csrf @method('DELETE')`;
+                    form.innerHTML = `
+                    @csrf
+                    @method('DELETE')
+                `;
                     document.body.appendChild(form);
                     form.submit();
                 }
             }
         </script>
     @endpush
-@endpush

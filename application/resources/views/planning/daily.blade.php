@@ -3,23 +3,23 @@
 @section('link')
     <style>
         :root {
-            --bg-light: #f4f5f7;
+            --bg-light: #f8fafc;
             --card-bg: #ffffff;
             --accent-green: #2ECC71;
             --pause-gold: #F1C40F;
             --danger-red: #E74C3C;
             --hour-h: 60px;
-            --text-dark: #1F1F1F;
-            --text-muted: #555555;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
         }
 
         body {
             background: var(--bg-light);
             color: var(--text-dark);
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
         }
 
-        /* KPI */
+        /* KPI Style */
         .kpi-wrapper {
             display: flex;
             gap: 15px;
@@ -29,39 +29,43 @@
 
         .kpi-card {
             background: var(--card-bg);
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem;
             min-width: 160px;
             flex: 1;
             text-align: center;
-            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
         }
 
         .kpi-card h6 {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
-            margin: 0;
+            text-transform: uppercase;
+            margin-bottom: 5px;
         }
 
         .kpi-card h3 {
-            margin: 5px 0 0;
-            font-weight: bold;
+            margin: 0;
+            font-weight: 800;
+            color: #0f172a;
         }
 
-        /* Timeline */
+        /* Graph Layout */
         .graph-frame {
             background: var(--card-bg);
-            border: 1px solid #ccc;
-            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
             overflow: hidden;
             position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .time-sidebar {
-            width: 60px;
-            background: #e9ecef;
-            border-right: 1px solid #ccc;
+            width: 65px;
+            background: #f1f5f9;
+            border-right: 1px solid #e2e8f0;
             position: sticky;
             left: 0;
             z-index: 100;
@@ -72,135 +76,191 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            border-bottom: 1px solid #ddd;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #94a3b8;
+            border-bottom: 1px dotted #cbd5e1;
         }
 
-        /* Managers */
         .manager-col {
-            min-width: 260px;
-            border-right: 1px solid #ccc;
+            min-width: 280px;
+            border-right: 1px solid #f1f5f9;
             position: relative;
         }
 
         .manager-head {
             height: 110px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-bottom: 2px solid var(--accent-green);
+            padding: 15px;
+            background: #ffffff;
+            border-bottom: 3px solid var(--accent-green);
             position: sticky;
             top: 0;
             z-index: 90;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        /* Blocks */
+        /* Blocks Styles */
         .block-work,
         .block-pause,
         .block-anomaly {
             position: absolute;
-            width: 90%;
-            left: 5%;
+            width: 88%;
+            left: 6%;
             border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: bold;
+            font-size: 0.7rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
         }
 
         .block-work {
-            background: var(--accent-green);
+            background: rgba(46, 204, 113, 0.9);
             color: #fff;
             flex-direction: column;
             justify-content: space-between;
             padding: 4px 0;
+            border: 1px solid #27ae60;
         }
 
         .block-pause {
             background: var(--pause-gold);
-            color: #000;
+            color: #453505;
+            border: 1px solid #d4ac0d;
         }
 
         .block-anomaly {
             background: var(--danger-red);
             color: #fff;
-            font-size: 0.7rem;
             text-transform: uppercase;
+            border: 1px solid #c0392b;
+            animation: pulse 2s infinite;
         }
 
-        /* Tooltip */
-        .tooltip-box {
-            position: absolute;
-            background: #333;
-            color: #fff;
-            font-size: 0.75rem;
-            padding: 6px 8px;
-            border-radius: 6px;
-            white-space: nowrap;
-            z-index: 9999;
-            pointer-events: none;
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
-        /* Now line */
-        #now-line {
+        /* Sticky Headers */
+        .projet-container>.bg-dark {
+            position: sticky;
+            top: 0;
+            z-index: 110;
+        }
+
+        .superviseur-section .bg-light {
+            position: sticky;
+            top: 38px;
+            z-index: 105;
+        }
+
+        .now-line-custom {
             position: absolute;
             left: 0;
             right: 0;
-            border-top: 2px dashed #ff4500;
+            border-top: 2px solid #ef4444;
             z-index: 200;
+            pointer-events: none;
+        }
+
+        .now-line-custom::before {
+            content: 'NOW';
+            position: absolute;
+            left: 0;
+            top: -10px;
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            padding: 2px 4px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .tooltip-box {
+            position: absolute;
+            background: #0f172a;
+            color: #fff;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 9999;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
         }
     </style>
 @endsection
 
 @section('content')
-    <div class="container-fluid p-4">
+    <div class="container-fluid p-4" style="margin-top: 60px;">
 
-        {{-- KPI --}}
         <div id="kpi-container" class="kpi-wrapper"></div>
 
-        {{-- Filters --}}
-        <div class="filter-bar row g-3 mb-4">
-            <div class="col-md-2">
-                <input type="text" id="manager_search" class="form-control form-control-sm"
-                    placeholder="Recherche manager...">
-            </div>
-            <div class="col-md-2">
-                <input type="date" id="target_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}"
-                    onchange="loadData()">
-            </div>
-            <div class="col-md-3">
-                <select id="site_f" class="form-select form-select-sm" onchange="updateProjetFilter()">
-                    <option value="">Tous les sites</option>
-                    @foreach ($sites as $s)
-                        <option value="{{ $s }}">{{ $s }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-5">
-                <select id="projet_f" class="form-select form-select-sm" onchange="loadData()">
-                    <option value="">Tous les projets</option>
-                    @foreach ($projetsList as $p)
-                        <option value="{{ $p->id }}" data-site="{{ $p->site }}">{{ $p->designation }}</option>
-                    @endforeach
-                </select>
+        <div class="card border-0 shadow-sm p-3 mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted">CHERCHER</label>
+                    <input type="text" id="manager_search" class="form-control form-control-sm shadow-none"
+                        placeholder="Nom du manager...">
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold text-muted">DATE CIBLE</label>
+                    <input type="date" id="target_date" class="form-control form-control-sm shadow-none"
+                        value="{{ date('Y-m-d') }}" onchange="loadData()">
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted">SITE</label>
+                    <select id="site_f" class="form-select form-select-sm shadow-none" onchange="updateProjetFilter()">
+                        <option value="">Tous les sites</option>
+                        @foreach ($sites as $s)
+                            <option value="{{ $s }}" {{ $selectedSiteId == $s ? 'selected' : '' }}>
+                                {{ $s }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="small fw-bold text-muted">PROJET</label>
+                    <select id="projet_f" class="form-select form-select-sm shadow-none" onchange="loadData()">
+                        <option value="">Tous les projets rattachés</option>
+                        @foreach ($projetsList as $p)
+                            <option value="{{ $p->id }}" data-site="{{ $p->site_id }}"
+                                {{ $selectedProjetId == $p->id ? 'selected' : '' }}>{{ $p->designation }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
 
-        {{-- Graph --}}
-        <div id="graph-zone" class="graph-frame"></div>
-
+        <div id="graph-zone" class="graph-frame">
+            <div class="p-5 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div>
+                Initialisation du Command Center...
+            </div>
+        </div>
     </div>
 @endsection
 
 @push('scripts')
     <script>
-        const PX_H = 60;
-        const START_H = 6;
-        let allData = []; // garder les données pour filtres
+        const PX_H = 60,
+            START_H = 6;
+        let allData = [];
 
-        /* ================= KPI ================= */
+        function tToF(t) {
+            if (!t) return 0;
+            let p = t.split(':');
+            return parseInt(p[0]) + (parseInt(p[1] || 0) / 60);
+        }
+
         function calculateKPI(flatManagers) {
             let kpi = {
                 total: 0,
@@ -225,154 +285,139 @@
 
         function renderKPI(k) {
             $('#kpi-container').html(`
-    <div class="kpi-card" data-tooltip="Nombre total de managers"><h6>Managers</h6><h3>${k.total}</h3></div>
-    <div class="kpi-card" data-tooltip="Managers démarrés en retard"><h6>Retards</h6><h3>${k.retards}</h3></div>
-    <div class="kpi-card" data-tooltip="Managers terminant plus tôt"><h6>Départs anticipés</h6><h3>${k.departAnticipe}</h3></div>
-    <div class="kpi-card" data-tooltip="Pauses dépassant la durée"><h6>Dépassements pause</h6><h3>${k.depassement}</h3></div>
-    <div class="kpi-card" data-tooltip="Somme des heures travaillées"><h6>Heures totales</h6><h3>${k.workHours.toFixed(1)}h</h3></div>
-    `);
+                <div class="kpi-card"><h6>Managers</h6><h3>${k.total}</h3></div>
+                <div class="kpi-card"><h6>Retards</h6><h3 class="${k.retards > 0 ? 'text-danger' : ''}">${k.retards}</h3></div>
+                <div class="kpi-card"><h6>Départs Anticipe</h6><h3>${k.departAnticipe}</h3></div>
+                <div class="kpi-card"><h6>Over-Pause</h6><h3 class="text-warning">${k.depassement}</h3></div>
+                <div class="kpi-card"><h6>Capacité Prod</h6><h3>${k.workHours.toFixed(1)}h</h3></div>
+            `);
         }
 
-        /* ================= LOAD ================= */
+        /* ================= DATA LOADING ================= */
         function loadData() {
-            $.get("{{ route('getDailyPlanningData') }}", {
+            // On récupère les valeurs, mais si c'est "vide", le contrôleur renverra tout
+            const params = {
                 date: $('#target_date').val(),
-                site_id: $('#site_f').val(),
-                projet_id: $('#projet_f').val()
-            }, data => {
+                site_id: $('#site_f').val() || null, // On envoie null si rien n'est sélectionné
+                projet_id: $('#projet_f').val() || null
+            };
+
+            $('#graph-zone').html(
+                `<div class="p-5 text-center text-muted">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            Chargement de la vue globale...
+        </div>`
+            );
+
+            $.get("{{ route('getDailyPlanningData') }}", params, data => {
                 allData = data;
                 renderMain(data);
+            }).fail(() => {
+                $('#graph-zone').html('<div class="p-5 text-center text-danger">Erreur de chargement.</div>');
             });
         }
 
-        /* ================= FILTRE PROJET ================= */
+        $(document).ready(() => {
+            // 1. On lance le chargement immédiat des données
+            // Pour l'Admin IT, comme les filtres sont vides, tout sortira par défaut
+            loadData();
+
+            // 2. On lance l'indicateur de ligne "NOW"
+            setInterval(updateNowIndicator, 60000);
+        });
+
         function updateProjetFilter() {
             const siteVal = $('#site_f').val();
             $('#projet_f option').each(function() {
                 const site = $(this).data('site');
-                if (siteVal && site !== siteVal) {
-                    $(this).hide();
-                } else {
-                    $(this).show();
-                }
+                if (siteVal && site != siteVal && $(this).val() !== "") $(this).hide();
+                else $(this).show();
             });
-            $('#projet_f').val('');
             loadData();
         }
 
-        /* ================= RECHERCHE MANAGER ================= */
-        $('#manager_search').on('input', function() {
-            const term = $(this).val().toLowerCase();
-            if (!allData.length) return;
-            const filteredData = allData.map(s => {
-                const top_managers = s.top_managers.map(tm => {
-                    const managers = tm.managers.filter(m => m.nom.toLowerCase().includes(term));
-                    return {
-                        ...tm,
-                        managers
-                    };
-                }).filter(tm => tm.managers.length > 0);
-                return {
-                    ...s,
-                    top_managers
-                };
-            }).filter(s => s.top_managers.length > 0);
-            renderMain(filteredData);
-        });
-
-        /* ================= RENDER ================= */
         function renderMain(data) {
-            let html = '';
-            let flatManagers = [];
-            data.forEach(s => s.top_managers.forEach(tm => tm.managers.forEach(m => flatManagers.push(m))));
-            renderKPI(calculateKPI(flatManagers));
+            let allManagersFlat = [];
+            data.forEach(p => p.top_managers.forEach(tm => tm.managers.forEach(m => allManagersFlat.push(m))));
+            renderKPI(calculateKPI(allManagersFlat));
 
-            data.forEach(s => {
-                html +=
-                    `<div class="p-2 bg-light text-dark fw-bold small border-bottom border-secondary">${s.site} - ${s.projet}</div>`;
-                s.top_managers.forEach(tm => {
-                    html += `<div class="d-flex overflow-auto">
-                <div class="time-sidebar">${renderTimeline()}</div>
-                <div class="d-flex position-relative flex-grow-1" style="height:${17*PX_H}px;">
-                    <div id="now-line"></div>
-                    ${tm.managers.map(renderManager).join('')}
-                </div>
-            </div>`;
+            if (data.length === 0) {
+                $('#graph-zone').html(
+                    '<div class="p-5 text-center text-muted">Aucun projet ou planning disponible pour cette sélection.</div>'
+                );
+                return;
+            }
+
+            let html = '';
+            data.forEach(p => {
+                html += `
+                <div class="projet-container mb-5 shadow-sm">
+                    <div class="p-2 bg-dark text-white fw-bold small d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-project-diagram me-2 text-primary"></i>PROJET : ${p.projet}</span>
+                        <span class="badge bg-secondary">SITE : ${p.site}</span>
+                    </div>`;
+                p.top_managers.forEach(tm => {
+                    html += `
+                    <div class="superviseur-section bg-white border-bottom">
+                        <div class="p-2 small fw-bold text-muted bg-light border-bottom">
+                            <i class="fas fa-user-tie me-2 text-info"></i>SUPERVISEUR : ${tm.top_manager}
+                        </div>
+                        <div class="d-flex overflow-auto">
+                            <div class="time-sidebar">${renderTimeline()}</div>
+                            <div class="d-flex position-relative flex-grow-1" style="min-height:${17 * PX_H}px; background-image: linear-gradient(#f1f5f9 1px, transparent 1px); background-size: 100% ${PX_H}px;">
+                                <div class="now-line-custom"></div>
+                                ${tm.managers.map(renderManager).join('')}
+                            </div>
+                        </div>
+                    </div>`;
                 });
+                html += `</div>`;
             });
-            $('#graph-zone').html(html || '<div class="p-5 text-center">Aucune donnée</div>');
+            $('#graph-zone').html(html);
             updateNowIndicator();
         }
 
-        /* ================= MANAGER ================= */
         function renderManager(m) {
-            let tWork = 0,
-                tPause = 0,
-                segmentBlocks = '',
-                pauseBlocks = '',
-                anomalyBlocks = '';
-            let firstStart = null,
-                lastEnd = null;
-            m.segments.forEach((s, i) => {
+            let segs = '',
+                pauses = '',
+                anomalies = '',
+                tW = 0,
+                tP = 0;
+            m.segments.forEach(s => {
                 let sF = tToF(s.start),
                     eF = tToF(s.end);
-                if (i === 0) firstStart = sF;
-                if (i === m.segments.length - 1) lastEnd = eF;
-                let top = (sF - START_H) * PX_H;
-                let height = (eF - sF) * PX_H;
-                tWork += (eF - sF);
-                segmentBlocks +=
-                    `<div class="block-work" style="top:${top}px;height:${height}px;" data-tooltip="Travail ${s.start}-${s.end} (${(eF-sF).toFixed(2)}h)"><span>${s.start}</span><span>${s.end}</span></div>`;
+                let top = (sF - START_H) * PX_H,
+                    h = (eF - sF) * PX_H;
+                tW += (eF - sF);
+                segs +=
+                    `<div class="block-work" style="top:${top}px;height:${h}px;" data-tooltip="Poste : ${s.start} - ${s.end}"><span>${s.start}</span><i class="fas fa-chevron-down small opacity-50"></i><span>${s.end}</span></div>`;
             });
             if (m.pauses) m.pauses.forEach(p => {
-                let psF = tToF(p.start),
-                    peF = tToF(p.end);
-                let top = (psF - START_H) * PX_H;
-                let height = (peF - psF) * PX_H;
-                tPause += p.minutes ?? ((peF - psF) * 60);
+                let ps = tToF(p.start),
+                    pe = tToF(p.end);
+                let top = (ps - START_H) * PX_H,
+                    h = (pe - ps) * PX_H;
+                tP += p.minutes || (pe - ps) * 60;
                 let cls = p.status === 'DEPASSEMENT' ? 'block-anomaly' : 'block-pause';
-                let label = p.status === 'DEPASSEMENT' ? `⚠ Dépassement (${p.minutes}m)` : 'PAUSE';
-                pauseBlocks +=
-                    `<div class="${cls}" style="top:${top}px;height:${height}px;" data-tooltip="${label}">${label}</div>`;
+                pauses +=
+                    `<div class="${cls}" style="top:${top}px;height:${h}px;" data-tooltip="${p.status}: ${p.start}-${p.end}">PAUSE</div>`;
             });
-            if (m.start_status === 'RETARD' && firstStart !== null) {
-                let top = (firstStart - START_H) * PX_H - 20;
-                anomalyBlocks +=
-                    `<div class="block-anomaly" style="top:${top}px;height:18px;" data-tooltip="Retard ${m.retard_minutes} minutes">RETARD (${m.retard_minutes}m)</div>`;
+            if (m.start_status === 'RETARD') {
+                let top = (tToF(m.segments[0].start) - START_H) * PX_H - 15;
+                anomalies +=
+                    `<div class="block-anomaly" style="top:${top}px;height:18px;width:60%;left:20%;" data-tooltip="Retard">RETARD</div>`;
             }
-            if (m.end_status === 'DEPART_ANTICIPE' && lastEnd !== null) {
-                let top = (lastEnd - START_H) * PX_H;
-                anomalyBlocks +=
-                    `<div class="block-anomaly" style="top:${top}px;height:18px;" data-tooltip="Départ anticipé ${m.depart_anticipe_minutes} minutes">DÉPART -${m.depart_anticipe_minutes}m</div>`;
-            }
-
-            return `<div class="manager-col">
-        <div class="manager-head">
-            <div class="fw-bold small">${m.nom}</div>
-            <div style="font-size:0.65rem;color:#555;">TRV: ${tWork.toFixed(2)}h | PSE: ${Math.round(tPause)}m</div>
-            <div class="badge mt-2 w-100 ${m.is_connected?'bg-success':'bg-danger'}">${m.is_connected?'CONNECTÉ':'HORS LIGNE'}</div>
-        </div>
-        <div class="position-relative" style="height:${17*PX_H}px;">${segmentBlocks}${pauseBlocks}${anomalyBlocks}</div>
-    </div>`;
+            return `
+                <div class="manager-col">
+                    <div class="manager-head">
+                        <div class="fw-bold text-primary truncate">${m.nom}</div>
+                        <div style="font-size:0.65rem;" class="text-muted fw-bold">PROD: ${tW.toFixed(1)}h | PSE: ${Math.round(tP)}m</div>
+                        <div class="badge mt-2 ${m.is_connected ? 'bg-success' : 'bg-light text-muted border'}">${m.is_connected ? '● ONLINE' : '○ OFFLINE'}</div>
+                    </div>
+                    <div class="position-relative" style="height:${17 * PX_H}px;">${segs}${pauses}${anomalies}</div>
+                </div>`;
         }
 
-        /* ================= TOOLTIP ================= */
-        document.addEventListener('mouseover', e => {
-            if (e.target.dataset.tooltip) {
-                const t = document.createElement('div');
-                t.className = 'tooltip-box';
-                t.innerText = e.target.dataset.tooltip;
-                document.body.appendChild(t);
-                const r = e.target.getBoundingClientRect();
-                t.style.left = r.left + 'px';
-                t.style.top = (r.top - 35) + 'px';
-            }
-        });
-        document.addEventListener('mouseout', e => {
-            if (e.target.dataset.tooltip) document.querySelectorAll('.tooltip-box').forEach(el => el.remove());
-        });
-
-        /* ================= UTIL ================= */
         function renderTimeline() {
             let h = '';
             for (let i = START_H; i <= 22; i++) h += `<div class="hour-label">${i}:00</div>`;
@@ -380,25 +425,43 @@
         }
 
         function updateNowIndicator() {
-            const n = new Date();
-            const h = n.getHours() + (n.getMinutes() / 60);
+            const n = new Date(),
+                h = n.getHours() + (n.getMinutes() / 60);
             if (h >= START_H && h <= 22) {
                 const top = (h - START_H) * PX_H + 110;
-                $('#now-line').css({
+                $('.now-line-custom').css({
                     top: top + 'px',
                     display: 'block'
                 });
-            } else $('#now-line').hide();
+            } else $('.now-line-custom').hide();
         }
 
-        function tToF(t) {
-            if (!t) return 0;
-            let p = t.split(':');
-            return parseInt(p[0]) + (parseInt(p[1] || 0) / 60);
-        }
+        $('#manager_search').on('input', function() {
+            const term = $(this).val().toLowerCase();
+            const filtered = allData.map(p => ({
+                ...p,
+                top_managers: p.top_managers.map(tm => ({
+                    ...tm,
+                    managers: tm.managers.filter(m => m.nom.toLowerCase().includes(term))
+                })).filter(tm => tm.managers.length > 0)
+            })).filter(p => p.top_managers.length > 0);
+            renderMain(filtered);
+        });
+
         $(document).ready(() => {
             loadData();
-            setInterval(updateNowIndicator, 30000);
+            setInterval(updateNowIndicator, 60000);
+        });
+
+        $(document).on('mouseover', '[data-tooltip]', function() {
+            const t = $('<div class="tooltip-box"></div>').text($(this).data('tooltip')).appendTo('body');
+            const r = this.getBoundingClientRect();
+            t.css({
+                left: r.left + (r.width / 2) - t.outerWidth() / 2,
+                top: r.top - t.outerHeight() - 10
+            });
+        }).on('mouseout', '[data-tooltip]', function() {
+            $('.tooltip-box').remove();
         });
     </script>
 @endpush
