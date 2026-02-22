@@ -64,4 +64,10 @@ class Agent extends Model
     }
 
     
+    public function pointages(): HasMany
+    {
+        // Assurez-vous que la colonne dans la table pointages est bien 'agent_id'
+        return $this->hasMany(Pointage::class, 'agent_id');
+    }
+    
 }

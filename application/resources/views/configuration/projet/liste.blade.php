@@ -15,14 +15,12 @@
             background-color: var(--bg-light);
         }
 
-        /* Container fluid élargi pour plus de confort */
         @media (min-width: 1400px) {
             .container-fluid {
                 max-width: 1600px;
             }
         }
 
-        /* Header Titre */
         .column_title {
             background: white;
             padding: 1.5rem;
@@ -32,14 +30,12 @@
             margin-bottom: 2rem;
         }
 
-        /* Cartes Stats & Import */
         .card-custom {
             border-radius: 12px;
             transition: transform 0.2s;
             border: none;
         }
 
-        /* Tableau - Look Professionnel */
         #siteTable {
             border-radius: 12px;
             overflow: hidden;
@@ -48,7 +44,6 @@
 
         #siteTable thead th {
             background-color: #1e293b;
-            /* Bleu nuit pro */
             color: #f8fafc;
             text-transform: uppercase;
             font-size: 0.75rem;
@@ -57,17 +52,10 @@
             border: none;
         }
 
-        #siteTable tbody tr {
-            transition: all 0.2s ease;
-        }
-
         #siteTable tbody tr:hover {
             background-color: #f0f7ff !important;
-            /* Bleu très léger au survol */
-            transform: scale(1.001);
         }
 
-        /* Style des groupes de sites (Plus visible) */
         .site-group-header {
             background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 100%) !important;
             font-weight: 800;
@@ -75,14 +63,8 @@
             border-bottom: 2px solid #cbd5e1 !important;
         }
 
-        .site-group-header td {
-            padding: 12px 15px !important;
-            font-size: 0.9rem;
-        }
-
-        /* Badge MSA ID (Design monospacé type "Code") */
         .badge-msa {
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
             font-weight: 600;
             background: #f1f5f9;
@@ -90,29 +72,18 @@
             padding: 6px 10px;
             border-radius: 6px;
             border: 1px solid #e2e8f0;
-            display: inline-block;
         }
 
-        /* Nom du Projet (Plus gros et plus sombre) */
         .projet-name {
             font-size: 1.05rem;
             color: #0f172a;
             font-weight: 700;
         }
-
-        /* Stats numériques */
-        .stat-number {
-            font-size: 1.8rem;
-            line-height: 1;
-            background: linear-gradient(45deg, #0d47a1, #42a5f5);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
     </style>
 
     <div class="container-fluid py-4">
         {{-- Header --}}
-        <div class="column_title rounded shadow-sm">
+        <div class="column_title rounded shadow-sm d-flex justify-content-between align-items-center">
             <div>
                 <h2 class="fw-bold text-primary mb-0"><i class="fas fa-project-diagram me-2"></i> Gestion des Projets</h2>
                 <p class="text-muted mb-0 small">Administration du périmètre et des structures</p>
@@ -122,67 +93,69 @@
             </div>
         </div>
 
-        {{-- Bloc Importation & Actions (Comme sur Planning) --}}
+        {{-- Bloc Importation (RH uniquement) & Stats --}}
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body p-3">
                 <div class="row align-items-center">
-                    {{-- Zone Importation --}}
-                    <div class="col-md-7 border-end">
-                        <form action="{{ route('projet.import') }}" method="POST" enctype="multipart/form-data">
-                            @csrf
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label small fw-bold mb-0 text-uppercase">
-                                    <i class="fas fa-file-excel me-1 text-success"></i> Importer Référentiel Projets
-                                </label>
-                                <a href="{{ asset('templates/masque_import_projets.xlsx') }}"
-                                    class="text-success small fw-bold text-decoration-none">
-                                    <i class="fas fa-download"></i> Télécharger le masque
-                                </a>
-                            </div>
-                            <div class="input-group input-group-sm">
-                                <input type="file" name="file" class="form-control" required>
-                                <button type="submit" class="btn btn-success px-4">
-                                    <i class="fas fa-upload me-1"></i> Charger
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    {{-- Zone Info --}}
-                    <div class="col-md-5 text-center">
-                        <label class="form-label small fw-bold mb-2 text-uppercase text-secondary">Statistiques
-                            rapides</label>
-                        <div class="d-flex justify-content-center gap-4">
-                            <div><span class="d-block h5 mb-0 fw-bold text-primary" id="totalProjets">--</span><small
-                                    class="text-muted">Projets</small></div>
-                            <div class="border-start ps-4">
-                                <span class="d-block h5 mb-0 fw-bold text-success" id="totalSites">--</span><small
-                                    class="text-muted">Sites</small>
-                            </div>
+                    @if (auth()->user()->hasRole('RH'))
+                        <div class="col-md-7 border-end">
+                            <form action="{{ route('projet.import') }}" method="POST" enctype="multipart/form-data">
+                                @csrf
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label small fw-bold mb-0 text-uppercase">
+                                        <i class="fas fa-file-excel me-1 text-success"></i> Importer Référentiel Projets
+                                    </label>
+                                    <a href="{{ asset('templates/masque_import_projets.xlsx') }}"
+                                        class="text-success small fw-bold text-decoration-none">
+                                        <i class="fas fa-download"></i> Télécharger le masque
+                                    </a>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <input type="file" name="file" class="form-control" required>
+                                    <button type="submit" class="btn btn-success px-4">
+                                        <i class="fas fa-upload me-1"></i> Charger
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-5 text-center">
+                        @else
+                            <div class="col-md-12 text-center">
+                    @endif
+                    <label class="form-label small fw-bold mb-2 text-uppercase text-secondary">Statistiques rapides</label>
+                    <div class="d-flex justify-content-center gap-4">
+                        <div><span class="d-block h5 mb-0 fw-bold text-primary" id="totalProjets">--</span><small
+                                class="text-muted">Projets</small></div>
+                        <div class="border-start ps-4">
+                            <span class="d-block h5 mb-0 fw-bold text-success" id="totalSites">--</span><small
+                                class="text-muted">Sites</small>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        {{-- Tableau des Projets --}}
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-4">
-                <div class="table-responsive">
-                    <table id="siteTable" class="table align-middle w-100">
-                        <thead>
-                            <tr>
-                                <th>Site (Groupe)</th> {{-- Colonne invisible servant au regroupement --}}
-                                <th style="width: 150px;">MSA ID</th>
-                                <th>Désignation du Projet</th>
-                                <th>DLT Superviseur</th>
+    {{-- Tableau --}}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <div class="table-responsive">
+                <table id="siteTable" class="table align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th>Site (Groupe)</th>
+                            <th style="width: 150px;">MSA ID</th>
+                            <th>Désignation du Projet</th>
+                            <th>DLT Superviseur</th>
+                            @if (auth()->user()->hasRole('RH'))
                                 <th class="text-center">Action</th>
-                            </tr>
-                        </thead>
-                    </table>
-                </div>
+                            @endif
+                        </tr>
+                    </thead>
+                </table>
             </div>
         </div>
+    </div>
     </div>
 @endsection
 
@@ -198,48 +171,54 @@
 
     <script>
         $(document).ready(function() {
+            const isRH = {{ auth()->user()->hasRole('RH') ? 'true' : 'false' }};
             const groupColumn = 0;
+
+            // 1. Définition dynamique des colonnes
+            let columnsDef = [{
+                    data: 'site_nom',
+                    name: 'sites.designation',
+                    visible: false
+                },
+                {
+                    data: 'msa_id',
+                    name: 'projets.msa_id',
+                    render: data => data ? `<span class="badge-msa">${data}</span>` :
+                        '<span class="text-muted">-</span>'
+                },
+                {
+                    data: 'projet_nom',
+                    name: 'projets.designation',
+                    render: data => `<span class="projet-name">${data}</span>`
+                },
+                {
+                    data: 'dltsuperviseur',
+                    name: 'projets.dltsuperviseur',
+                    render: data => data || '<span class="text-muted small">Non défini</span>'
+                }
+            ];
+
+            if (isRH) {
+                columnsDef.push({
+                    data: 'action',
+                    name: 'action',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center'
+                });
+            }
+
+            // 2. Initialisation DataTables
             const table = $('#siteTable').DataTable({
                 processing: true,
                 serverSide: true,
                 ajax: {
                     url: "{{ route('projet.ajax') }}",
                     error: function(xhr) {
-                        console.error("Erreur Backend Projet:", xhr.responseText);
-                        $('#siteTable_processing').hide();
-                        // Notification plus discrète que l'alert
-                        console.error("Erreur serveur lors du chargement des projets.");
+                        console.error("Erreur Backend:", xhr.responseText);
                     }
                 },
-                columns: [{
-                        data: 'site_nom',
-                        name: 'sites.designation',
-                        visible: false
-                    },
-                    {
-                        data: 'msa_id',
-                        name: 'projets.msa_id',
-                        render: data => data ? `<span class="badge-msa">${data}</span>` :
-                            '<span class="text-muted">-</span>'
-                    },
-                    {
-                        data: 'projet_nom',
-                        name: 'projets.designation',
-                        render: data => `<span class="projet-name">${data}</span>`
-                    },
-                    {
-                        data: 'dltsuperviseur',
-                        name: 'projets.dltsuperviseur',
-                        render: data => data || '<span class="text-muted small">Non défini</span>'
-                    },
-                    {
-                        data: 'action',
-                        name: 'action',
-                        orderable: false,
-                        searchable: false,
-                        className: 'text-center'
-                    }
-                ],
+                columns: columnsDef,
                 order: [
                     [groupColumn, 'asc']
                 ],
@@ -247,7 +226,7 @@
                 buttons: [{
                     extend: 'excel',
                     className: 'btn btn-outline-success btn-sm border-2',
-                    text: '<i class="far fa-file-excel me-2"></i>Exporter le Référentiel'
+                    text: '<i class="far fa-file-excel me-2"></i>Exporter'
                 }],
                 pageLength: 50,
                 language: {
@@ -260,45 +239,36 @@
                         page: 'current'
                     }).nodes();
                     let last = null;
-                    let subtotal = 0;
 
-                    // Optimisation du regroupement
+                    // Ajustement du colspan : 4 colonnes visibles si RH (MSA, Nom, DLT, Action), sinon 3
+                    const dynamicColspan = isRH ? 4 : 3;
+
                     api.column(groupColumn, {
                         page: 'current'
                     }).data().each(function(group, i) {
                         if (last !== group) {
-                            // Calcul du nombre de projets dans ce groupe spécifique pour le badge
                             const count = api.column(groupColumn).data().filter(v => v ===
                                 group).length;
-
                             $(rows).eq(i).before(
                                 `<tr class="site-group-header">
-                                <td colspan="4" class="py-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <i class="fas fa-building me-2 text-primary"></i>
-                                            SITE : <span class="fw-bolder">${group ? group.toUpperCase() : 'SANS SITE'}</span>
+                                    <td colspan="${dynamicColspan}" class="py-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div><i class="fas fa-building me-2 text-primary"></i>SITE : <span class="fw-bolder">${group ? group.toUpperCase() : 'SANS SITE'}</span></div>
+                                            <span class="badge rounded-pill bg-primary shadow-sm">${count} Projets</span>
                                         </div>
-                                        <span class="badge rounded-pill bg-primary shadow-sm">${count} Projets</span>
-                                    </div>
-                                </td>
-                            </tr>`
+                                    </td>
+                                </tr>`
                             );
                             last = group;
                         }
                     });
 
-                    // Mise à jour des compteurs globaux (Header)
-                    const totalRecords = api.page.info().recordsTotal;
-                    $('#totalProjets').fadeOut(200, function() {
-                        $(this).text(totalRecords).fadeIn(200);
-                    });
-
+                    // Update Stats
+                    const info = api.page.info();
+                    $('#totalProjets').text(info.recordsTotal);
                     const uniqueSites = [...new Set(api.column(groupColumn).data().toArray())].filter(
                         n => n);
-                    $('#totalSites').fadeOut(200, function() {
-                        $(this).text(uniqueSites.length).fadeIn(200);
-                    });
+                    $('#totalSites').text(uniqueSites.length);
                 }
             });
         });

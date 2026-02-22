@@ -20,7 +20,7 @@ class AgentsImport implements ToModel, WithChunkReading, WithHeadingRow, SkipsOn
             'Directeur'   => ['JC0603', 'JC2550', 'JC0600', 'JC0881', 'JT0323', 'JC0091'],
             'Top Manager' => ['JC0630', 'JC0605', 'JC0604', 'JC3370', 'JC1655', 'JC0801'],
             'Manager'     => ['JC1704', 'JC2555', 'JC1619', 'JC3375', 'JC1618', 'JC0629', 'JC0634', 'JC2770', 'JC0631', 'JC3221', 'JC2757', 'JC1705', 'JC1767'],
-            'RH'          => ['JC0879', 'JC0877', 'JC0203', 'JC0878','JC0868' ,'JC2714'],
+            'RH'          => ['JC0879', 'JC0877', 'JC0203', 'JC0878','JC0868' ,'JC2714', 'JC0828'],
         ];
 
         $jobCode = $row['job_code'] ?? null;

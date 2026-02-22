@@ -106,7 +106,10 @@
                                 <th>Email</th>
                                 <th>Projet</th>
                                 <th>Responsable</th>
-                                <th class="text-center">Actions</th>
+                                {{-- Restriction de l'en-tête --}}
+                                @if (auth()->user()->hasRole('RH'))
+                                    <th class="text-center">Actions</th>
+                                @endif
                             </tr>
                         </thead>
                     </table>
@@ -127,94 +130,87 @@
 
         <script>
             $(document).ready(function() {
-                // 1. Traduction française intégrée (évite la requête HTTP 404)
+                // On récupère le rôle via Blade pour le JS
+                const isRH = {{ auth()->user()->hasRole('RH') ? 'true' : 'false' }};
+
                 const dataTableLanguage = {
-                    "emptyTable": "Aucun agent trouvé",
-                    "info": "Affichage de _START_ à _END_ sur _TOTAL_ agents",
-                    "infoEmpty": "Affichage de 0 à 0 sur 0 entrées",
-                    "infoFiltered": "(filtré de _MAX_ agents)",
-                    "lengthMenu": "Afficher _MENU_ agents",
-                    "loadingRecords": "Chargement en cours...",
-                    "processing": "Traitement...",
-                    "search": "Rechercher :",
-                    "zeroRecords": "Aucun agent correspondant trouvé",
-                    "paginate": {
-                        "first": "Premier",
-                        "last": "Dernier",
-                        "next": "Suivant",
-                        "previous": "Précédent"
-                    }
+                    /* ... votre config existante ... */
                 };
 
-                // 2. Initialisation DataTables
+                // Définition de base des colonnes
+                let columnsConfig = [{
+                        data: 'site',
+                        name: 'site',
+                        orderable: false
+                    },
+                    {
+                        data: 'workday_id',
+                        name: 'workday_id'
+                    },
+                    {
+                        data: 'nom',
+                        name: 'nom',
+                        render: function(data, type, row) {
+                            const prenom = row.prenom ? row.prenom.split(' ')[0] : '';
+                            return `<span class="fw-bold text-dark">${data}</span> <span class="text-muted">${prenom}</span>`;
+                        }
+                    },
+                    {
+                        data: 'fonction',
+                        name: 'fonction'
+                    },
+                    {
+                        data: 'work_email',
+                        name: 'work_email'
+                    },
+                    {
+                        data: 'projet',
+                        name: 'projet',
+                        render: function(data) {
+                            return `<span class="badge bg-light text-primary border">${data}</span>`;
+                        }
+                    },
+                    {
+                        data: 'manager_nom',
+                        name: 'manager_nom'
+                    }
+                ];
+
+                // Ajout dynamique de la colonne Action SI RH
+                if (isRH) {
+                    columnsConfig.push({
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center',
+                        render: function(data, type, row) {
+                            return `
+                <div class="btn-group shadow-sm">
+                    <a href="{{ url('effectif') }}/${row.id}/edit" class="btn btn-white btn-sm border" title="Modifier">
+                        <i class="fas fa-edit text-primary"></i>
+                    </a>
+                    <button type="button" class="btn btn-white btn-sm border" 
+                            onclick="confirmDelete('{{ url('effectif') }}/${row.id}', '${row.nom}')" title="Supprimer">
+                        <i class="fas fa-trash text-danger"></i>
+                    </button>
+                </div>`;
+                        }
+                    });
+                }
+
                 const table = $('#agentTable').DataTable({
                     processing: true,
                     serverSide: true,
                     responsive: true,
                     ajax: {
                         url: "{{ route('effectif.ajax') }}",
-                        type: "GET",
-                        error: function(xhr) {
-                            console.error("Erreur serveur : ", xhr.responseText);
-                        }
+                        type: "GET"
                     },
-                    columns: [{
-                            data: 'site',
-                            name: 'site',
-                            orderable: false
-                        },
-                        {
-                            data: 'workday_id',
-                            name: 'workday_id'
-                        },
-                        {
-                            data: 'nom',
-                            name: 'nom',
-                            render: function(data, type, row) {
-                                const prenom = row.prenom ? row.prenom.split(' ')[0] : '';
-                                return `<span class="fw-bold text-dark">${data}</span> <span class="text-muted">${prenom}</span>`;
-                            }
-                        },
-                        {
-                            data: 'fonction',
-                            name: 'fonction'
-                        },
-                        {
-                            data: 'work_email',
-                            name: 'work_email'
-                        },
-                        {
-                            data: 'projet',
-                            name: 'projet',
-                            render: function(data) {
-                                return `<span class="badge bg-light text-primary border">${data}</span>`;
-                            }
-                        },
-                        {
-                            data: 'manager_nom',
-                            name: 'manager_nom'
-                        },
-                        {
-                            data: null,
-                            orderable: false,
-                            searchable: false,
-                            className: 'text-center',
-                            render: function(data, type, row) {
-                                return `
-                            <div class="btn-group shadow-sm">
-                                <a href="{{ url('effectif') }}/${row.id}/edit" class="btn btn-white btn-sm border" title="Modifier">
-                                    <i class="fas fa-edit text-primary"></i>
-                                </a>
-                                <button type="button" class="btn btn-white btn-sm border" 
-                                        onclick="confirmDelete('{{ url('effectif') }}/${row.id}', '${row.nom}')" title="Supprimer">
-                                    <i class="fas fa-trash text-danger"></i>
-                                </button>
-                            </div>`;
-                            }
-                        }
-                    ],
+                    columns: columnsConfig, // Utilisation de la configuration dynamique
                     dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
-                    buttons: [{
+                    buttons: [
+                        // On peut aussi restreindre les exports ici si besoin
+                        {
                             extend: 'excel',
                             className: 'btn btn-outline-success btn-sm',
                             text: '<i class="fas fa-file-excel"></i>'

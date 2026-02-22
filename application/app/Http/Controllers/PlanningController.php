@@ -14,6 +14,10 @@ use App\Imports\PlanningsImport;
 
 class PlanningController extends Controller
 {
+
+    const TOLERANCE_RETARD = 5; 
+    const TOLERANCE_PAUSE  = 10;
+    const PAUSE_THEORIQUE  = 60;
     /**
      * Vue de saisie hebdomadaire (Tableau avec Inputs)
      */
@@ -213,91 +217,11 @@ class PlanningController extends Controller
         ]);
     }
 
-    /**
-     * API : Données pour le graphique journalier
-     */
-    public function getDailyPlanningData(Request $request): JsonResponse
-    {
-        try {
-            $user = auth()->user();
-            $date = $request->get('date', Carbon::today()->format('Y-m-d'));
-            $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
-
-            $queryProjets = Projet::query();
-            if (!$isFullAccess) {
-                $queryProjets->whereHas('agents', fn($q) => $q->where('work_email', $user->work_email));
-            }
-            if ($request->filled('site_id')) $queryProjets->where('site_id', $request->get('site_id'));
-            if ($request->filled('projet_id') && $request->get('projet_id') !== 'null') $queryProjets->where('id', $request->get('projet_id'));
-
-            $projets = $queryProjets->get();
-            $resultat = [];
-
-            foreach ($projets as $projet) {
-                $allManagers = Agent::whereHas('projets', fn($q) => $q->where('projets.id', $projet->id))->get();
-                $topManagersGroups = [];
-
-                foreach ($allManagers as $manager) {
-                    $boss = Agent::where('workday_id', $manager->manager)->first();
-                    $topManagerName = $boss ? "{$boss->prenom} {$boss->nom}" : "Direction / Hors Groupe";
-
-                    $pointage = DB::table('pointages')->where('agent_id', $manager->id)->whereDate('date_pointage', $date)->first();
-                    if (!$pointage) continue;
-
-                    if (!isset($topManagersGroups[$topManagerName])) $topManagersGroups[$topManagerName] = ['top_manager' => $topManagerName, 'managers' => []];
-
-                    $analysis = $this->analyzePointage($pointage, $date);
-                    $topManagersGroups[$topManagerName]['managers'][] = [
-                        'nom' => "{$manager->prenom} {$manager->nom}",
-                        'role' => $manager->fonction ?? 'Manager',
-                        'is_connected' => $manager->last_seen >= now()->subMinutes(10),
-                        'real_start' => $pointage->entree ? Carbon::parse($pointage->entree)->format('H:i') : null,
-                        'segments' => $this->calculateWorkSegments($pointage->entree, $pointage->sortie, $pointage->pause_debut, $pointage->pause_fin),
-                        'pauses' => $analysis['pauses'],
-                        'start_status' => $analysis['start_status'],
-                        'end_status'   => $analysis['end_status'],
-                        'retard_minutes' => $analysis['retard_minutes']
-                    ];
-                }
-
-                if (!empty($topManagersGroups)) {
-                    $resultat[] = ['id_projet' => $projet->id, 'site' => $projet->site_id, 'projet' => $projet->designation, 'top_managers' => array_values($topManagersGroups)];
-                }
-            }
-            return response()->json($resultat);
-        } catch (\Exception $e) {
-            Log::error("API Journalier Error: " . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
 
     /**
      * Helpers de calcul
      */
-    private function analyzePointage($pointage, $date): array
-    {
-        $PAUSE_NORMAL = 60; $TOLERANCE = 5; $retardMinutes = 0;
-        $pauseMinutes = 0; $pauseStatus = null;
-        if ($pointage->pause_debut && $pointage->pause_fin) {
-            $pauseMinutes = Carbon::parse($pointage->pause_debut)->diffInMinutes(Carbon::parse($pointage->pause_fin));
-            if ($pauseMinutes > ($PAUSE_NORMAL + $TOLERANCE)) $pauseStatus = 'DEPASSEMENT';
-        }
-        $startStatus = null;
-        if ($pointage->entree) {
-            $shiftStart = Carbon::parse($date . ' 06:00');
-            $diff = $shiftStart->diffInMinutes(Carbon::parse($pointage->entree), false);
-            if ($diff > $TOLERANCE) { $startStatus = 'RETARD'; $retardMinutes = $diff; }
-        }
-        $endStatus = null;
-        if ($pointage->sortie) {
-            $shiftEnd = Carbon::parse($date . ' 18:00');
-            if (Carbon::parse($pointage->sortie)->lt($shiftEnd)) $endStatus = 'DEPART_ANTICIPE';
-        }
-        return [
-            'pauses' => ($pointage->pause_debut && $pointage->pause_fin) ? [['start' => Carbon::parse($pointage->pause_debut)->format('H:i'), 'end' => Carbon::parse($pointage->pause_fin)->format('H:i'), 'minutes' => $pauseMinutes, 'status' => $pauseStatus]] : [],
-            'start_status' => $startStatus, 'end_status' => $endStatus, 'retard_minutes' => $retardMinutes
-        ];
-    }
+   
 
     private function calculateWorkSegments($entree, $sortie, $p_debut, $p_fin): array
     {
@@ -357,4 +281,147 @@ class PlanningController extends Controller
         try { Excel::import(new PlanningsImport($request->week), $request->file('file')); return back()->with('success', 'Importation réussie.'); } 
         catch (\Exception $e) { Log::error("Import Error: " . $e->getMessage()); return back()->with('error', "Erreur d'importation."); }
     }
+
+
+    public function getDailyPlanningData(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $date = $request->get('date', Carbon::today()->format('Y-m-d'));
+            $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
+
+            // Optimisation : Chargement groupé (Eager Loading)
+            $queryProjets = Projet::with(['agents' => function($q) use ($date) {
+                $q->with(['pointages' => function($pq) use ($date) {
+                    $pq->whereDate('date_pointage', $date);
+                }]);
+            }]);
+
+            if (!$isFullAccess) {
+                $queryProjets->whereHas('agents', fn($q) => $q->where('work_email', $user->work_email));
+            }
+            if ($request->filled('site_id')) $queryProjets->where('site_id', $request->get('site_id'));
+            if ($request->filled('projet_id') && $request->get('projet_id') !== 'null') $queryProjets->where('id', $request->get('projet_id'));
+
+            $projets = $queryProjets->get();
+            
+            // Pré-récupération des managers pour éviter le N+1
+            $managerIds = $projets->pluck('agents.*.manager')->flatten()->filter()->unique();
+            $allBosses = Agent::whereIn('workday_id', $managerIds)->get()->keyBy('workday_id');
+
+            $resultat = [];
+
+            foreach ($projets as $projet) {
+                $topManagersGroups = [];
+
+                foreach ($projet->agents as $manager) {
+                    $pointage = $manager->pointages->first();
+                    if (!$pointage) continue;
+
+                    $boss = $allBosses->get($manager->manager);
+                    $topManagerName = $boss ? "{$boss->prenom} {$boss->nom}" : "Direction / Hors Groupe";
+
+                    if (!isset($topManagersGroups[$topManagerName])) {
+                        $topManagersGroups[$topManagerName] = ['top_manager' => $topManagerName, 'managers' => []];
+                    }
+
+                    // Appel de l'analyse avec les nouvelles règles
+                    $analysis = $this->analyzePointage($pointage, $date);
+
+                    $topManagersGroups[$topManagerName]['managers'][] = [
+                        'nom' => "{$manager->prenom} {$manager->nom}",
+                        'role' => $manager->fonction ?? 'Manager',
+                        'is_connected' => $manager->last_seen >= now()->subMinutes(10),
+                        'real_start' => $pointage->entree ? Carbon::parse($pointage->entree)->format('H:i') : null,
+                        'real_end' => $pointage->sortie ? Carbon::parse($pointage->sortie)->format('H:i') : null,
+                        'segments' => $this->calculateWorkSegments($pointage->entree, $pointage->sortie, $pointage->pause_debut, $pointage->pause_fin),
+                        'pauses' => $analysis['pauses'],
+                        'start_status' => $analysis['start_status'],
+                        'end_status'   => $analysis['end_status'],
+                        'retard_minutes' => $analysis['retard_minutes'],
+                        'is_oubli' => $analysis['is_oubli']
+                    ];
+                }
+
+                if (!empty($topManagersGroups)) {
+                    $resultat[] = [
+                        'id_projet' => $projet->id, 
+                        'site' => $projet->site_id, 
+                        'projet' => $projet->designation, 
+                        'top_managers' => array_values($topManagersGroups)
+                    ];
+                }
+            }
+            return response()->json($resultat);
+        } catch (\Exception $e) {
+            Log::error("API Journalier Error: " . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function analyzePointage($pointage, $date)
+    {
+        $pauses = [];
+        $start_status = null;
+        $end_status = null;
+        $retard_minutes = 0;
+        $is_oubli = false;
+
+        // 1. Analyse du Retard (> 5 min)
+        // Supposons une heure théorique de début à 08:00 (à adapter selon votre planning_theorique)
+        $heure_prevue_debut = Carbon::parse($date . ' 08:00:00'); 
+        $heure_entree = Carbon::parse($pointage->entree);
+
+        if ($heure_entree->gt($heure_prevue_debut)) {
+            $diff = $heure_entree->diffInMinutes($heure_prevue_debut);
+            if ($diff > self::TOLERANCE_RETARD) {
+                $start_status = 'RETARD';
+                $retard_minutes = $diff;
+            }
+        }
+
+        // 2. Analyse de la Pause (> 10 min de dépassement)
+        if ($pointage->pause_debut && $pointage->pause_fin) {
+            $p_start = Carbon::parse($pointage->pause_debut);
+            $p_end = Carbon::parse($pointage->pause_fin);
+            $duree = $p_start->diffInMinutes($p_end);
+            
+            $status_pause = null;
+            if ($duree > (self::PAUSE_THEORIQUE + self::TOLERANCE_PAUSE)) {
+                $status_pause = 'DEPASSEMENT';
+            }
+
+            $pauses[] = [
+                'start' => $p_start->format('H:i'),
+                'end' => $p_end->format('H:i'),
+                'minutes' => $duree,
+                'status' => $status_pause
+            ];
+        }
+
+        // 3. Analyse Départ Anticipé / Oubli
+        $heure_prevue_fin = Carbon::parse($date . ' 18:00:00'); // Exemple 18h
+
+        if ($pointage->sortie) {
+            $heure_sortie = Carbon::parse($pointage->sortie);
+            if ($heure_sortie->lt($heure_prevue_fin)) {
+                $end_status = 'DEPART_ANTICIPE';
+            }
+        } else {
+            // Si pas de sortie et qu'il est déjà 19h (heure fin + 1h), on considère un oubli
+            if (now()->gt($heure_prevue_fin->addHour())) {
+                $is_oubli = true;
+            }
+        }
+
+        return [
+            'pauses' => $pauses,
+            'start_status' => $start_status,
+            'end_status' => $end_status,
+            'retard_minutes' => $retard_minutes,
+            'is_oubli' => $is_oubli
+        ];
+    }
 }
+
+

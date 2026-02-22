@@ -293,60 +293,27 @@
             `);
         }
 
-        /* ================= DATA LOADING ================= */
         function loadData() {
-            // On récupère les valeurs, mais si c'est "vide", le contrôleur renverra tout
             const params = {
                 date: $('#target_date').val(),
-                site_id: $('#site_f').val() || null, // On envoie null si rien n'est sélectionné
+                site_id: $('#site_f').val() || null,
                 projet_id: $('#projet_f').val() || null
             };
 
             $('#graph-zone').html(
-                `<div class="p-5 text-center text-muted">
-            <div class="spinner-border spinner-border-sm me-2"></div>
-            Chargement de la vue globale...
-        </div>`
+                `<div class="p-5 text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Chargement...</div>`
             );
 
             $.get("{{ route('getDailyPlanningData') }}", params, data => {
                 allData = data;
                 renderMain(data);
-            }).fail(() => {
-                $('#graph-zone').html('<div class="p-5 text-center text-danger">Erreur de chargement.</div>');
             });
-        }
-
-        $(document).ready(() => {
-            // 1. On lance le chargement immédiat des données
-            // Pour l'Admin IT, comme les filtres sont vides, tout sortira par défaut
-            loadData();
-
-            // 2. On lance l'indicateur de ligne "NOW"
-            setInterval(updateNowIndicator, 60000);
-        });
-
-        function updateProjetFilter() {
-            const siteVal = $('#site_f').val();
-            $('#projet_f option').each(function() {
-                const site = $(this).data('site');
-                if (siteVal && site != siteVal && $(this).val() !== "") $(this).hide();
-                else $(this).show();
-            });
-            loadData();
         }
 
         function renderMain(data) {
             let allManagersFlat = [];
             data.forEach(p => p.top_managers.forEach(tm => tm.managers.forEach(m => allManagersFlat.push(m))));
             renderKPI(calculateKPI(allManagersFlat));
-
-            if (data.length === 0) {
-                $('#graph-zone').html(
-                    '<div class="p-5 text-center text-muted">Aucun projet ou planning disponible pour cette sélection.</div>'
-                );
-                return;
-            }
 
             let html = '';
             data.forEach(p => {
@@ -359,12 +326,10 @@
                 p.top_managers.forEach(tm => {
                     html += `
                     <div class="superviseur-section bg-white border-bottom">
-                        <div class="p-2 small fw-bold text-muted bg-light border-bottom">
-                            <i class="fas fa-user-tie me-2 text-info"></i>SUPERVISEUR : ${tm.top_manager}
-                        </div>
+                        <div class="p-2 small fw-bold text-muted bg-light border-bottom">SUPERVISEUR : ${tm.top_manager}</div>
                         <div class="d-flex overflow-auto">
                             <div class="time-sidebar">${renderTimeline()}</div>
-                            <div class="d-flex position-relative flex-grow-1" style="min-height:${17 * PX_H}px; background-image: linear-gradient(#f1f5f9 1px, transparent 1px); background-size: 100% ${PX_H}px;">
+                            <div class="d-flex position-relative flex-grow-1" style="min-height:${17 * PX_H}px;">
                                 <div class="now-line-custom"></div>
                                 ${tm.managers.map(renderManager).join('')}
                             </div>
@@ -383,30 +348,52 @@
                 anomalies = '',
                 tW = 0,
                 tP = 0;
+
             m.segments.forEach(s => {
                 let sF = tToF(s.start),
-                    eF = tToF(s.end);
-                let top = (sF - START_H) * PX_H,
+                    eF = tToF(s.end),
+                    top = (sF - START_H) * PX_H,
                     h = (eF - sF) * PX_H;
                 tW += (eF - sF);
-                segs +=
-                    `<div class="block-work" style="top:${top}px;height:${h}px;" data-tooltip="Poste : ${s.start} - ${s.end}"><span>${s.start}</span><i class="fas fa-chevron-down small opacity-50"></i><span>${s.end}</span></div>`;
+                segs += `<div class="block-work" style="top:${top}px;height:${h}px;" data-tooltip="Poste : ${s.start} - ${s.end}">
+                            <span>${s.start}</span><i class="fas fa-chevron-down small opacity-50"></i><span>${s.end}</span>
+                         </div>`;
             });
+
             if (m.pauses) m.pauses.forEach(p => {
                 let ps = tToF(p.start),
-                    pe = tToF(p.end);
-                let top = (ps - START_H) * PX_H,
+                    pe = tToF(p.end),
+                    top = (ps - START_H) * PX_H,
                     h = (pe - ps) * PX_H;
-                tP += p.minutes || (pe - ps) * 60;
+                tP += p.minutes;
                 let cls = p.status === 'DEPASSEMENT' ? 'block-anomaly' : 'block-pause';
                 pauses +=
-                    `<div class="${cls}" style="top:${top}px;height:${h}px;" data-tooltip="${p.status}: ${p.start}-${p.end}">PAUSE</div>`;
+                    `<div class="${cls}" style="top:${top}px;height:${h}px;" data-tooltip="${p.status || 'Pause'}: ${p.minutes}min">PAUSE</div>`;
             });
-            if (m.start_status === 'RETARD') {
-                let top = (tToF(m.segments[0].start) - START_H) * PX_H - 15;
+
+            // 1. ANOMALIE RETARD (>5 min)
+            if (m.start_status === 'RETARD' && m.retard_minutes > 5) {
+                let topPos = (tToF(m.segments[0].start) - START_H) * PX_H - 18;
                 anomalies +=
-                    `<div class="block-anomaly" style="top:${top}px;height:18px;width:60%;left:20%;" data-tooltip="Retard">RETARD</div>`;
+                    `<div class="block-anomaly" style="top:${topPos}px;height:18px;" data-tooltip="Retard: ${m.retard_minutes}min">RETARD ${m.retard_minutes}m</div>`;
             }
+
+            // 2. ANOMALIE DEPART ANTICIPÉ
+            if (m.end_status === 'DEPART_ANTICIPE') {
+                let lastSegEnd = tToF(m.segments[m.segments.length - 1].end);
+                let topPos = (lastSegEnd - START_H) * PX_H;
+                anomalies +=
+                    `<div class="block-anomaly" style="top:${topPos}px;height:18px;background:#6366f1;border-color:#4f46e5;" data-tooltip="Sortie précoce à ${m.real_end}">DEPART ANTICIPÉ</div>`;
+            }
+
+            // 3. ANOMALIE OUBLI SORTIE
+            if (m.is_oubli) {
+                let lastSegEnd = tToF(m.segments[m.segments.length - 1].end);
+                let topPos = (lastSegEnd - START_H) * PX_H;
+                anomalies +=
+                    `<div class="block-anomaly" style="top:${topPos}px;height:18px;background:#94a3b8;border-color:#64748b;" data-tooltip="Oubli de déconnexion">OUBLI SORTIE</div>`;
+            }
+
             return `
                 <div class="manager-col">
                     <div class="manager-head">
@@ -428,12 +415,45 @@
             const n = new Date(),
                 h = n.getHours() + (n.getMinutes() / 60);
             if (h >= START_H && h <= 22) {
-                const top = (h - START_H) * PX_H + 110;
                 $('.now-line-custom').css({
-                    top: top + 'px',
+                    top: ((h - START_H) * PX_H + 110) + 'px',
                     display: 'block'
                 });
             } else $('.now-line-custom').hide();
+        }
+
+        /* ================= GESTION DU TOOLTIP (POP) - FIX POSITION ================= */
+        $(document).on('mouseenter', '[data-tooltip]', function() {
+            const message = $(this).data('tooltip');
+            const $tip = $('<div class="tooltip-box"></div>').text(message).appendTo('body');
+            const rect = this.getBoundingClientRect();
+
+            // Correction : ajout de window.pageXOffset / window.pageYOffset
+            const left = rect.left + window.pageXOffset + (rect.width / 2) - ($tip.outerWidth() / 2);
+            const top = rect.top + window.pageYOffset - $tip.outerHeight() - 5;
+
+            $tip.css({
+                left: left + 'px',
+                top: top + 'px',
+                opacity: 1
+            });
+        }).on('mouseleave', '[data-tooltip]', function() {
+            $('.tooltip-box').remove();
+        });
+
+        $(document).ready(() => {
+            loadData();
+            setInterval(updateNowIndicator, 60000);
+        });
+
+        function updateProjetFilter() {
+            const siteVal = $('#site_f').val();
+            $('#projet_f option').each(function() {
+                const site = $(this).data('site');
+                if (siteVal && site != siteVal && $(this).val() !== "") $(this).hide();
+                else $(this).show();
+            });
+            loadData();
         }
 
         $('#manager_search').on('input', function() {
@@ -446,22 +466,6 @@
                 })).filter(tm => tm.managers.length > 0)
             })).filter(p => p.top_managers.length > 0);
             renderMain(filtered);
-        });
-
-        $(document).ready(() => {
-            loadData();
-            setInterval(updateNowIndicator, 60000);
-        });
-
-        $(document).on('mouseover', '[data-tooltip]', function() {
-            const t = $('<div class="tooltip-box"></div>').text($(this).data('tooltip')).appendTo('body');
-            const r = this.getBoundingClientRect();
-            t.css({
-                left: r.left + (r.width / 2) - t.outerWidth() / 2,
-                top: r.top - t.outerHeight() - 10
-            });
-        }).on('mouseout', '[data-tooltip]', function() {
-            $('.tooltip-box').remove();
         });
     </script>
 @endpush
