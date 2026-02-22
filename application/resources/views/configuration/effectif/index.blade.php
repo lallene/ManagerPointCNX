@@ -38,6 +38,40 @@
             display: block;
         }
 
+        /* Nouveaux Styles Premium */
+        .site-badge {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-weight: 800;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+            margin: 0 auto;
+        }
+
+        .badge-projet {
+            background-color: #eaf2ff;
+            color: #0d6efd;
+            border: 1px solid #d0e2ff;
+            font-weight: 600;
+            font-size: 0.65rem;
+            padding: 0.4em 0.8em;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+
+        .fonction-tag {
+            font-size: 0.75rem;
+            letter-spacing: 0.3px;
+            color: #475569;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
         .btn-template {
             color: #198754;
             background-color: #eafaf1;
@@ -50,6 +84,10 @@
         .btn-template:hover {
             background-color: #198754;
             color: white;
+        }
+
+        #agentTable tbody tr:hover {
+            background-color: #f8fafc !important;
         }
     </style>
 
@@ -96,17 +134,16 @@
 
             <div class="card-body p-4">
                 <div class="table-responsive">
-                    <table id="agentTable" class="table table-hover w-100">
+                    <table id="agentTable" class="table align-middle w-100">
                         <thead>
                             <tr>
-                                <th>Site</th>
+                                <th class="text-center">Site</th>
                                 <th>Matricule</th>
-                                <th>Nom & Prénom</th>
+                                <th>Agent</th>
                                 <th>Fonction</th>
-                                <th>Email</th>
-                                <th>Projet</th>
-                                <th>Responsable</th>
-                                {{-- Restriction de l'en-tête --}}
+                                <th>Email Professionnel</th>
+                                <th>Projet(s)</th>
+                                <th>Responsable Direct</th>
                                 @if (auth()->user()->hasRole('RH'))
                                     <th class="text-center">Actions</th>
                                 @endif
@@ -117,8 +154,8 @@
             </div>
         </div>
     </div>
+
     @push('scripts')
-        {{-- Chargement des dépendances via CDN --}}
         <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
         <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 
@@ -130,53 +167,67 @@
 
         <script>
             $(document).ready(function() {
-                // On récupère le rôle via Blade pour le JS
                 const isRH = {{ auth()->user()->hasRole('RH') ? 'true' : 'false' }};
 
-                const dataTableLanguage = {
-                    /* ... votre config existante ... */
-                };
-
-                // Définition de base des colonnes
                 let columnsConfig = [{
                         data: 'site',
                         name: 'site',
-                        orderable: false
+                        className: 'text-center',
+                        render: function(data) {
+                            return `<div class="site-badge">${data}</div>`; //
+                        }
                     },
                     {
                         data: 'workday_id',
-                        name: 'workday_id'
+                        name: 'workday_id',
+                        render: function(data) {
+                            return `<span class="fw-bold text-primary">${data}</span>`;
+                        }
                     },
                     {
                         data: 'nom',
                         name: 'nom',
                         render: function(data, type, row) {
-                            const prenom = row.prenom ? row.prenom.split(' ')[0] : '';
-                            return `<span class="fw-bold text-dark">${data}</span> <span class="text-muted">${prenom}</span>`;
+                            // Formatage identique à l'export Excel
+                            return `<div>
+                                <div class="fw-bold text-dark">${data.toUpperCase()}</div>
+                                <div class="small text-muted">${row.prenom || ''}</div>
+                            </div>`;
                         }
                     },
                     {
                         data: 'fonction',
-                        name: 'fonction'
+                        name: 'fonction',
+                        render: function(data) {
+                            return `<span class="fonction-tag"><i class="fas fa-id-badge me-1 opacity-50"></i>${data}</span>`;
+                        }
                     },
                     {
                         data: 'work_email',
-                        name: 'work_email'
+                        name: 'work_email',
+                        render: function(data) {
+                            return `<span class="small text-muted"><i class="far fa-envelope me-1"></i>${data}</span>`;
+                        }
                     },
                     {
                         data: 'projet',
                         name: 'projet',
                         render: function(data) {
-                            return `<span class="badge bg-light text-primary border">${data}</span>`;
+                            // Gestion des badges multiples
+                            if (!data) return '-';
+                            return data.split(',').map(p =>
+                                `<span class="badge badge-projet mb-1">${p.trim()}</span>`).join(' ');
                         }
                     },
                     {
                         data: 'manager_nom',
-                        name: 'manager_nom'
+                        name: 'manager_nom',
+                        render: function(data) {
+                            return `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`;
+                        }
                     }
                 ];
 
-                // Ajout dynamique de la colonne Action SI RH
                 if (isRH) {
                     columnsConfig.push({
                         data: null,
@@ -185,32 +236,26 @@
                         className: 'text-center',
                         render: function(data, type, row) {
                             return `
-                <div class="btn-group shadow-sm">
-                    <a href="{{ url('effectif') }}/${row.id}/edit" class="btn btn-white btn-sm border" title="Modifier">
-                        <i class="fas fa-edit text-primary"></i>
-                    </a>
-                    <button type="button" class="btn btn-white btn-sm border" 
-                            onclick="confirmDelete('{{ url('effectif') }}/${row.id}', '${row.nom}')" title="Supprimer">
-                        <i class="fas fa-trash text-danger"></i>
-                    </button>
-                </div>`;
+                                <div class="btn-group">
+                                    <a href="{{ url('effectif') }}/${row.id}/edit" class="btn btn-light btn-sm border" title="Modifier">
+                                        <i class="fas fa-edit text-primary"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-light btn-sm border" 
+                                            onclick="confirmDelete('{{ url('effectif') }}/${row.id}', '${row.nom}')" title="Supprimer">
+                                        <i class="fas fa-trash text-danger"></i>
+                                    </button>
+                                </div>`;
                         }
                     });
                 }
 
-                const table = $('#agentTable').DataTable({
+                $('#agentTable').DataTable({
                     processing: true,
                     serverSide: true,
-                    responsive: true,
-                    ajax: {
-                        url: "{{ route('effectif.ajax') }}",
-                        type: "GET"
-                    },
-                    columns: columnsConfig, // Utilisation de la configuration dynamique
+                    ajax: "{{ route('effectif.ajax') }}",
+                    columns: columnsConfig,
                     dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
-                    buttons: [
-                        // On peut aussi restreindre les exports ici si besoin
-                        {
+                    buttons: [{
                             extend: 'excel',
                             className: 'btn btn-outline-success btn-sm',
                             text: '<i class="fas fa-file-excel"></i>'
@@ -222,23 +267,22 @@
                         }
                     ],
                     pageLength: 25,
-                    language: dataTableLanguage
+                    language: {
+                        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json"
+                    }
                 });
             });
 
-            // 3. Fonction de suppression robuste
             function confirmDelete(url, name) {
                 if (confirm(`⚠️ Supprimer définitivement l'agent ${name} ?`)) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url;
-                    form.innerHTML = `
-                    @csrf
-                    @method('DELETE')
-                `;
+                    form.innerHTML = `@csrf @method('DELETE')`;
                     document.body.appendChild(form);
                     form.submit();
                 }
             }
         </script>
     @endpush
+@endsection

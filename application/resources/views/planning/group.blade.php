@@ -295,20 +295,32 @@
                 container.html(html);
             }
             // Filtre de recherche dynamique
+            // Filtre de recherche dynamique (Lead Dev Version)
             $(document).on('keyup', '#search-manager', function() {
                 var value = $(this).val().toLowerCase();
 
-                // On parcourt chaque ligne du tableau (sauf l'en-tête)
-                $("#planning-container tbody tr").filter(function() {
-                    // On cherche dans la première cellule (Nom/Prénom)
+                // 1. On filtre les lignes d'agents (Nom / Prénom / Fonction)
+                $("#planning-container tbody tr").each(function() {
                     var textToSearch = $(this).find("td:first").text().toLowerCase();
                     $(this).toggle(textToSearch.indexOf(value) > -1);
                 });
 
-                // Optionnel : Cacher la "group-card" entière si elle ne contient plus de lignes visibles
+                // 2. On filtre les cartes de groupes (Managers)
                 $('.group-card').each(function() {
                     var hasVisibleRows = $(this).find('tbody tr:visible').length > 0;
                     $(this).toggle(hasVisibleRows);
+                });
+
+                // 3. On filtre les sections de SITES (pour éviter les titres vides)
+                $('#planning-container > div.mb-5').each(function() {
+                    // On vérifie s'il reste au moins une carte de groupe visible dans ce site
+                    var hasVisibleGroups = $(this).find('.group-card:visible').length > 0;
+
+                    if (hasVisibleGroups || value === "") {
+                        $(this).show(); // On utilise show/hide pour la performance
+                    } else {
+                        $(this).hide();
+                    }
                 });
             });
         });

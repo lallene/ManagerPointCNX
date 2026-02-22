@@ -7,6 +7,8 @@ use App\Models\{Agent, Pointage, Planning, Projet, User};
 use Illuminate\Http\{Request, JsonResponse, RedirectResponse};
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
+    use App\Exports\PointageExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PointageController extends Controller
 {
@@ -16,9 +18,11 @@ class PointageController extends Controller
     public function index(): View
     {
         $user = Auth::user();
-        $isAdmin = ($user->work_email === 'admin@concentrix.com');
+        $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                 $user->hasAnyRole(['IT', 'RH', 'Directeur']);
         
-        if ($isAdmin) {
+        
+        if ($hasFullAccess) {
             // Admin voit tout
             $sites = Projet::select('site_id')->distinct()->whereNotNull('site_id')->pluck('site_id');
             $projetsList = Projet::orderBy('designation')->get();
@@ -34,7 +38,7 @@ class PointageController extends Controller
             'projetsList' => $projetsList,
             'semaines' => $this->generateWeekRange(),
             'selectedWeek' => now()->weekOfYear,
-            'isManager' => !$isAdmin
+            'isManager' => !$hasFullAccess
         ]);
     }
 
@@ -45,7 +49,9 @@ class PointageController extends Controller
     {
         try {
             $user = Auth::user();
-            $isAdmin = ($user->work_email === 'admin@concentrix.com');
+
+            $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+            $user->hasAnyRole(['IT', 'RH', 'Directeur']);
             
             // 1. Définition des dates de la semaine
             $weekNum = (int)$request->input('week', now()->weekOfYear);
@@ -57,7 +63,7 @@ class PointageController extends Controller
 
             // 2. Filtrage des projets autorisés
             $projets = Projet::query()
-                ->when(!$isAdmin, function($q) use ($user) {
+                ->when(!$hasFullAccess, function($q) use ($user) {
                     $q->whereHas('agents', fn($a) => $a->where('work_email', $user->work_email));
                 })
                 ->when($request->site_id, fn($q) => $q->where('site_id', $request->site_id))
@@ -229,4 +235,18 @@ class PointageController extends Controller
         }
         return $semaines;
     }
+
+
+
+public function exportExcel(Request $request) 
+{
+    // On récupère les filtres de la requête
+    $site_id = $request->site_id;
+    $projet_id = $request->projet_id;
+    $week = $request->week;
+
+    $fileName = "Export_Pointage_S{$week}.xlsx";
+
+    return Excel::download(new PointageExport($site_id, $projet_id, $week), $fileName);
+}
 }

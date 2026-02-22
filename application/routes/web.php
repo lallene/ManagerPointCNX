@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/api/data', [PointageController::class, 'getPointageData'])->name('pointage.api.data');
         Route::get('/api/projets-by-site', [PointageController::class, 'getProjetsBySite'])->name('api.projets.by.site');
         Route::get('/group', [PointageController::class, 'index'])->name('index');
+Route::get('/pointage/export/excel', [PointageController::class, 'exportExcel'])->name('pointage.export.excel');
 
     });
 
@@ -86,7 +87,7 @@ Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function 
         'destroy' => 'permission.destroy',
     ]);
     
-    Route::resource('projet', ProjetController::class)->except(['show']);
+  //  Route::resource('projet', ProjetController::class)->except(['show']);
     Route::resource('site', SiteController::class)->except(['show']);
     Route::post('/projet/import', [ProjetController::class, 'import'])->name('projet.import');
     
@@ -99,7 +100,6 @@ Route::get('/forgot-password', function () {
 })->name('password.request');
 
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
-
 
 
 Route::middleware(['auth'])->group(function () {

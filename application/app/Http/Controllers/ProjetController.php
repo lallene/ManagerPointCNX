@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 
 class ProjetController extends Controller
 {
+ 
     private string $templatePath = 'configuration.projet';
     private string $link = 'projet';
 

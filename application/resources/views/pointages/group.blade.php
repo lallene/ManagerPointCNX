@@ -2,7 +2,6 @@
 
 @section('content')
     <style>
-        /* Styles conservés et optimisés */
         .page-title {
             color: #333 !important;
             font-weight: 800 !important;
@@ -80,7 +79,7 @@
             </div>
         </div>
 
-        {{-- Filtres --}}
+        {{-- Barre de Filtres --}}
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
                 <form id="filter-form" class="row g-3 align-items-end">
@@ -117,9 +116,15 @@
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" id="btn-refresh" class="btn btn-primary w-100 fw-bold py-2">
-                            <i class="fas fa-sync-alt me-2"></i> ACTUALISER
-                        </button>
+                        <div class="d-grid gap-2">
+                            <button type="button" id="btn-refresh" class="btn btn-primary fw-bold">
+                                <i class="fas fa-sync-alt me-2"></i> ACTUALISER
+                            </button>
+                            {{-- Bouton Export Excel --}}
+                            <button type="button" id="btn-export-excel" class="btn btn-success fw-bold">
+                                <i class="fas fa-file-excel me-2"></i> EXCEL
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -149,7 +154,7 @@
         $(document).ready(function() {
             loadData(); // Premier chargement
 
-            // Événements
+            // Événements de mise à jour
             $('#btn-refresh').on('click', loadData);
             $('.btn-week, #site_id, #projet_id').on('change', loadData);
 
@@ -161,22 +166,32 @@
                 });
             });
 
+            // Action Export Excel (Lead Dev Step)
+            $('#btn-export-excel').on('click', function() {
+                const site_id = $('#site_id').val();
+                const projet_id = $('#projet_id').val();
+                const week = $('input[name="week"]:checked').val();
+
+                // On redirige vers la route d'export avec les paramètres
+                const url =
+                    `{{ route('pointage.export.excel') }}?site_id=${site_id}&projet_id=${projet_id}&week=${week}`;
+                window.location.href = url;
+            });
+
             function loadData() {
                 $('#loader').show();
-
                 const params = {
                     site_id: $('#site_id').val(),
                     projet_id: $('#projet_id').val(),
                     week: $('input[name="week"]:checked').val()
                 };
 
-                // Utilise EXACTEMENT ce nom de route
                 $.get("{{ route('pointage.api.data') }}", params, function(data) {
                     $('#loader').hide();
                     renderTables(data);
                 }).fail(function(xhr) {
                     $('#loader').hide();
-                    alert("Erreur " + xhr.status + " : Route introuvable ou crash serveur.");
+                    console.error("Erreur de chargement:", xhr);
                 });
             }
 
