@@ -38,7 +38,6 @@
             display: block;
         }
 
-        /* Nouveaux Styles Premium */
         .site-badge {
             width: 32px;
             height: 32px;
@@ -96,41 +95,46 @@
             <div class="col-md-12">
                 <div class="column_title">
                     <h2>{{ $titre }}</h2>
-                    <div class="breadcrumb-custom">
-                        <a href="{{ asset('templates/masque_import_agents.xlsx') }}"
-                            class="btn btn-template btn-sm px-3 shadow-sm">
-                            <i class="fas fa-download me-2"></i> Télécharger le modèle Excel
-                        </a>
-                    </div>
+                    @if (auth()->user()->hasAnyRole(['RH', 'IT', 'Directeur']))
+                        <div class="breadcrumb-custom">
+                            <a href="{{ asset('templates/masque_import_agents.xlsx') }}"
+                                class="btn btn-template btn-sm px-3 shadow-sm">
+                                <i class="fas fa-download me-2"></i> Télécharger le modèle Excel
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
 
         <div class="card shadow-sm border-0 mb-5">
-            <div class="import-section">
-                <form action="{{ route('effectif.import') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="row align-items-end g-3">
-                        <div class="col-md-5">
-                            <label class="label-recherche">
-                                <i class="fas fa-file-excel me-2 text-success"></i>Fichier de données
-                            </label>
-                            <input class="form-control form-control-sm" type="file" name="agent_file"
-                                accept=".xlsx,.xls,.csv" required>
+            {{-- Section d'importation : Visible uniquement pour le Board --}}
+            @if (auth()->user()->hasAnyRole(['RH', 'IT', 'Directeur']))
+                <div class="import-section">
+                    <form action="{{ route('effectif.import') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <div class="row align-items-end g-3">
+                            <div class="col-md-5">
+                                <label class="label-recherche">
+                                    <i class="fas fa-file-excel me-2 text-success"></i>Fichier de données
+                                </label>
+                                <input class="form-control form-control-sm" type="file" name="agent_file"
+                                    accept=".xlsx,.xls,.csv" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-success btn-sm w-100 shadow-sm">
+                                    <i class="fas fa-upload me-1"></i> Importer
+                                </button>
+                            </div>
+                            <div class="col-md-5 text-md-end">
+                                <a href="{{ route('effectif.create') }}" class="btn btn-primary btn-sm shadow-sm px-4">
+                                    <i class="fa fa-plus-circle me-1"></i> Ajout Manuel
+                                </a>
+                            </div>
                         </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-success btn-sm w-100 shadow-sm">
-                                <i class="fas fa-upload me-1"></i> Importer
-                            </button>
-                        </div>
-                        <div class="col-md-5 text-md-end">
-                            <a href="{{ route('effectif.create') }}" class="btn btn-primary btn-sm shadow-sm px-4">
-                                <i class="fa fa-plus-circle me-1"></i> Ajout Manuel
-                            </a>
-                        </div>
-                    </div>
-                </form>
-            </div>
+                    </form>
+                </div>
+            @endif
 
             <div class="card-body p-4">
                 <div class="table-responsive">
@@ -144,7 +148,8 @@
                                 <th>Email Professionnel</th>
                                 <th>Projet(s)</th>
                                 <th>Responsable Direct</th>
-                                @if (auth()->user()->hasRole('RH'))
+                                {{-- Colonne action visible uniquement pour RH ou Admin --}}
+                                @if (auth()->user()->hasAnyRole(['RH', 'IT']))
                                     <th class="text-center">Actions</th>
                                 @endif
                             </tr>
@@ -167,53 +172,45 @@
 
         <script>
             $(document).ready(function() {
-                const isRH = {{ auth()->user()->hasRole('RH') ? 'true' : 'false' }};
+                // Définition des droits côté JS
+                const canEdit = {{ auth()->user()->hasAnyRole(['RH', 'IT'])? 'true': 'false' }};
 
                 let columnsConfig = [{
                         data: 'site',
                         name: 'site',
                         className: 'text-center',
-                        render: function(data) {
-                            return `<div class="site-badge">${data}</div>`; //
-                        }
+                        render: data => `<div class="site-badge">${data || '?'}</div>`
                     },
                     {
                         data: 'workday_id',
                         name: 'workday_id',
-                        render: function(data) {
-                            return `<span class="fw-bold text-primary">${data}</span>`;
-                        }
+                        render: data => `<span class="fw-bold text-primary">${data}</span>`
                     },
                     {
                         data: 'nom',
                         name: 'nom',
-                        render: function(data, type, row) {
-                            // Formatage identique à l'export Excel
-                            return `<div>
+                        render: (data, type, row) => `
+                            <div>
                                 <div class="fw-bold text-dark">${data.toUpperCase()}</div>
                                 <div class="small text-muted">${row.prenom || ''}</div>
-                            </div>`;
-                        }
+                            </div>`
                     },
                     {
                         data: 'fonction',
                         name: 'fonction',
-                        render: function(data) {
-                            return `<span class="fonction-tag"><i class="fas fa-id-badge me-1 opacity-50"></i>${data}</span>`;
-                        }
+                        render: data =>
+                            `<span class="fonction-tag"><i class="fas fa-id-badge me-1 opacity-50"></i>${data}</span>`
                     },
                     {
                         data: 'work_email',
                         name: 'work_email',
-                        render: function(data) {
-                            return `<span class="small text-muted"><i class="far fa-envelope me-1"></i>${data}</span>`;
-                        }
+                        render: data =>
+                            `<span class="small text-muted"><i class="far fa-envelope me-1"></i>${data}</span>`
                     },
                     {
                         data: 'projet',
                         name: 'projet',
-                        render: function(data) {
-                            // Gestion des badges multiples
+                        render: data => {
                             if (!data) return '-';
                             return data.split(',').map(p =>
                                 `<span class="badge badge-projet mb-1">${p.trim()}</span>`).join(' ');
@@ -222,13 +219,13 @@
                     {
                         data: 'manager_nom',
                         name: 'manager_nom',
-                        render: function(data) {
-                            return `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`;
-                        }
+                        render: data =>
+                            `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`
                     }
                 ];
 
-                if (isRH) {
+                // Ajout de la colonne action si l'utilisateur a les droits
+                if (canEdit) {
                     columnsConfig.push({
                         data: null,
                         orderable: false,
@@ -258,12 +255,12 @@
                     buttons: [{
                             extend: 'excel',
                             className: 'btn btn-outline-success btn-sm',
-                            text: '<i class="fas fa-file-excel"></i>'
+                            text: '<i class="fas fa-file-excel me-1"></i> Excel'
                         },
                         {
                             extend: 'pdf',
                             className: 'btn btn-outline-danger btn-sm',
-                            text: '<i class="fas fa-file-pdf"></i>'
+                            text: '<i class="fas fa-file-pdf me-1"></i> PDF'
                         }
                     ],
                     pageLength: 25,

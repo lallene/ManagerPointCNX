@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\DataTables;
+use Illuminate\Support\Facades\Auth;
 
 class AgentController extends Controller
 {
@@ -26,10 +27,85 @@ class AgentController extends Controller
     private string $link = 'effectif';
 
     
-    public function index(Request $request): View
-    {
-         return view($this->templatePath . '.index', ['titre' => 'Liste des collaborateurs']);
+public function index(Request $request): View
+{
+    $user = Auth::user();
+    $titre = 'Liste des collaborateurs';
+
+    // Accès complet pour le Board
+    $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                    $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+
+    $userProjectIds = [];
+    if (!$isFullAccess) {
+        // Sécurité : On passe par l'agent rattaché pour avoir les IDs réels de la table pivot
+        $userProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [];
+        $titre = 'Mes Collaborateurs (Projets rattachés)';
     }
+
+    return view($this->templatePath . '.index', compact('titre', 'isFullAccess', 'userProjectIds'));
+}
+    public function ajax(Request $request)
+{
+    $user = Auth::user();
+
+    $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                    $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+
+    // Eager loading pour éviter le N+1
+    $query = Agent::with(['projets.site', 'supervisor'])->select('agents.*');
+
+    if (!$isFullAccess) {
+        // On récupère les IDs via l'agent lié au User
+        $userProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [0];
+        
+        $query->whereHas('projets', function($q) use ($userProjectIds) {
+            $q->whereIn('projets.id', $userProjectIds);
+        });
+    }
+
+    return DataTables::of($query)
+        // Colonne SITE
+        ->addColumn('site', function($agent) {
+            // On récupère les désignations des sites via les projets de l'agent
+            $siteNames = $agent->projets->map(function($p) {
+                return $p->site ? $p->site->designation : null;
+            })->filter()->unique();
+
+            if ($siteNames->isEmpty()) return '<span class="text-muted">-</span>';
+            
+            return $siteNames->map(function($name) {
+                return '<div class="site-badge">' . e($name) . '</div>';
+            })->implode(' ');
+        })
+
+        // Colonne PROJET
+        ->addColumn('projet', function($agent) {
+            if ($agent->projets->isEmpty()) return '<span class="text-muted small">Hors projet</span>';
+            
+            return $agent->projets->map(function($p) {
+                return '<span class="badge badge-projet mb-1">' . e($p->designation) . '</span>';
+            })->implode(' ');
+        })
+
+        // Colonne MANAGER
+        ->addColumn('manager_nom', function($agent) {
+            if ($agent->supervisor) {
+                return '<strong>' . strtoupper(e($agent->supervisor->nom)) . '</strong> ' . e($agent->supervisor->prenom);
+            }
+            return '<span class="badge bg-light text-secondary border small">DIRECTION</span>';
+        })
+
+        // Filtre de recherche sur les projets
+        ->filterColumn('projet', function($query, $keyword) {
+            $query->whereHas('projets', function($q) use ($keyword) {
+                $q->where('designation', 'like', "%{$keyword}%");
+            });
+        })
+
+        ->rawColumns(['site', 'projet', 'manager_nom']) 
+        ->make(true);
+}
     public function create(): View
     {
         $projets = Projet::all();
@@ -154,54 +230,7 @@ class AgentController extends Controller
 
     /**
      * DataTables Ajax : Affichage des projets multiples
-     */
-    public function ajax(Request $request)
-{
-    // 1. Eager Loading groupé pour éviter le problème N+1 sur les projets ET le manager
-    $query = Agent::with(['projets', 'supervisor'])->select('agents.*');
 
-    return DataTables::of($query)
-        // Colonne PROJET (badges HTML)
-        ->addColumn('projet', function($agent) {
-            if ($agent->projets->isEmpty()) {
-                return '<span class="badge bg-light text-muted">Aucun projet</span>';
-            }
-            return $agent->projets->map(function($p) {
-                return '<span class="badge bg-info text-dark" style="font-size: 0.75rem;">' . e($p->designation) . '</span>';
-            })->implode(' ');
-        })
-
-        // Colonne SITE
-        ->addColumn('site', function($agent) {
-            // On récupère les noms des sites via les projets
-            $sites = $agent->projets->pluck('site_id')->unique();
-            return $sites->isEmpty() ? '-' : $sites->implode(', ');
-        })
-
-        // Colonne MANAGER (Nom complet)
-        ->addColumn('manager_nom', function($agent) {
-            if ($agent->supervisor) {
-                return e($agent->supervisor->prenom . ' ' . $agent->supervisor->nom);
-            }
-            return '<span class="badge bg-secondary">Direction</span>';
-        })
-
-        // 2. FILTRAGE PERSONNALISÉ (Pour les colonnes calculées/pivot)
-        ->filterColumn('projet', function($query, $keyword) {
-            $query->whereHas('projets', function($q) use ($keyword) {
-                $q->where('designation', 'like', "%{$keyword}%");
-            });
-        })
-        
-        // 3. ACTIONS (Si nécessaire)
-        ->addColumn('action', function($agent) {
-            return '<button class="btn btn-sm btn-primary"><i class="fa fa-eye"></i></button>';
-        })
-
-        // On déclare toutes les colonnes contenant du HTML
-        ->rawColumns(['projet', 'manager_nom', 'action']) 
-        ->make(true);
-}
     /**
      * Formulaire d'édition
      */

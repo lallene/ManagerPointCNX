@@ -33,14 +33,6 @@ class User extends Authenticatable
         'password' => 'hashed', // Laravel 11 gère le hashage automatique si configuré
     ];
     
-    /**
-     * Relation avec l'Agent
-     * Un utilisateur est lié à un agent par son email professionnel.
-     */
-    public function agent()
-    {
-        return $this->hasOne(Agent::class, 'work_email', 'work_email');
-    }
 
     /**
      * Helper pour savoir si l'utilisateur est un admin (Optionnel)
@@ -50,8 +42,33 @@ class User extends Authenticatable
         return $this->hasRole('IT');
     }
 
+    /**
+     * Relation avec l'Agent
+     */
+    public function agent()
+    {
+        return $this->hasOne(Agent::class, 'work_email', 'work_email');
+    }
+
+    /**
+     * Correction Lead Dev : Récupérer les projets via l'Agent rattaché
+     * On ne peut pas faire un belongsToMany direct ici car la table pivot 
+     * est liée à 'agent_id' et non 'user_id'.
+     */
+    public function getProjetsAttribute()
+    {
+        return $this->agent ? $this->agent->projets : collect();
+    }
+
+    // Si tu veux quand même pouvoir faire $user->projets()->...
     public function projets()
-{
-    return $this->belongsToMany(Projet::class, 'projet_user');
-}
+    {
+        // On récupère l'ID de l'agent lié à cet utilisateur
+        $agentId = $this->agent ? $this->agent->id : null;
+        
+        // On définit la relation en pointant sur la table pivot réelle
+        return $this->belongsToMany(Projet::class, 'agent_projet', 'agent_id', 'projet_id')
+                    ->where('agent_id', $agentId);
+    }
+
 }
