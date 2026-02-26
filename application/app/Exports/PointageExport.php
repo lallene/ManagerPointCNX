@@ -2,111 +2,103 @@
 
 namespace App\Exports;
 
-use App\Models\Pointage;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{Auth, DB};
+use Carbon\Carbon;
 
 class PointageExport implements FromCollection, WithHeadings, ShouldAutoSize
 {
-    protected $site_id, $projet_id, $week;
+    protected $site_id, $projet_id, $week, $isFullAccess, $restrictedProjectIds;
 
-    public function __construct($site_id, $projet_id, $week)
+    public function __construct($site_id, $projet_id, $week, $isFullAccess, $restrictedProjectIds)
     {
         $this->site_id = $site_id;
         $this->projet_id = $projet_id;
-        $this->week = $week;
+        $this->week = (int)$week;
+        $this->isFullAccess = $isFullAccess;
+        $this->restrictedProjectIds = $restrictedProjectIds;
     }
 
     public function collection()
     {
-        $user = Auth::user();
-        
-        // 1. DÉTERMINATION DYNAMIQUE DE LA SEMAINE
-        $currentYear = date('Y'); 
-        $currentWeek = (int)date('W');
-        $annee = ($this->week > $currentWeek + 10) ? ($currentYear - 1) : $currentYear;
-        $semaineFormatee = $annee . '-' . str_pad($this->week, 2, '0', STR_PAD_LEFT); 
+        $semaineCible = now()->year . '-' . str_pad($this->week, 2, '0', STR_PAD_LEFT);
 
-        // 2. LOGIQUE D'ACCÈS
-        $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
-                        $user->hasAnyRole(['IT', 'RH', 'Directeur']);
-
-        // 3. REQUÊTE AVEC JOINTURES
         $query = DB::table('pointages')
             ->join('agents', 'pointages.agent_id', '=', 'agents.id')
             ->leftJoin('plannings', 'pointages.planning_id', '=', 'plannings.id')
-            ->where('pointages.semaine', $semaineFormatee);
+            // Jointures pour remonter jusqu'au nom du projet
+            ->join('agent_projet', 'agents.id', '=', 'agent_projet.agent_id')
+            ->join('projets', 'agent_projet.projet_id', '=', 'projets.id')
+            ->where('pointages.semaine', $semaineCible);
 
-        // 4. FILTRAGES (Site & Projet)
-        if ($this->site_id) $query->where('pointages.site_id', $this->site_id);
-
-        if (!$isFullAccess) {
-            $userProjectIds = $user->projets()->pluck('projets.id')->toArray();
-            if ($this->projet_id && in_array($this->projet_id, $userProjectIds)) {
-                $query->where('pointages.projet_id', $this->projet_id);
-            } else {
-                $query->whereIn('pointages.projet_id', $userProjectIds);
-            }
-        } elseif ($this->projet_id) {
-            $query->where('pointages.projet_id', $this->projet_id);
+        // --- SÉCURITÉ PÉRIMÈTRE ---
+        if (!$this->isFullAccess) {
+            $query->whereIn('agent_projet.projet_id', $this->restrictedProjectIds);
         }
 
-        // 5. TRAITEMENT ET CALCULS
+        // --- FILTRES OPTIONNELS ---
+        if ($this->site_id) {
+            $query->where('agents.site_id', $this->site_id); 
+        }
+        
+        if ($this->projet_id && $this->projet_id !== 'null') {
+            $query->where('agent_projet.projet_id', $this->projet_id);
+        }
+
         return $query->select(
             'agents.workday_id',
+            'projets.designation as projet_nom', // On récupère le nom du projet
+            'agents.nom',
+            'agents.prenom',
             'agents.work_email',
             'agents.fonction',
             'pointages.date_pointage',
-            'agents.nom', 
-            'agents.prenom', 
-            'plannings.entree as planning_entree', 
-            'plannings.sortie as planning_sortie', 
-            'pointages.entree as reel_entree', 
-            'pointages.sortie as reel_sortie',
+            'plannings.entree as p_in',
+            'plannings.sortie as p_out',
+            'pointages.entree as a_in',
+            'pointages.sortie as a_out',
             'pointages.minutes_travaillees'
-        )->get()->map(function($item) {
+        )
+        ->distinct()
+        ->orderBy('projets.designation') // Tri par projet pour plus de clarté
+        ->orderBy('pointages.date_pointage')
+        ->get()
+        ->map(function($item) {
             
-            // Calcul du retard (Fiable via strtotime)
-            $retardMinutes = 0;
-            if ($item->planning_entree && $item->reel_entree) {
-                $h_prevu = strtotime($item->planning_entree);
-                $h_reel = strtotime($item->reel_entree);
-                
-                if ($h_reel > $h_prevu) {
-                    $retardMinutes = ($h_reel - $h_prevu) / 60;
+            // Calcul du Retard
+            $retardMin = 0;
+            if ($item->p_in && $item->a_in) {
+                $prevu = Carbon::parse($item->p_in);
+                $reel = Carbon::parse($item->a_in);
+                if ($reel->gt($prevu)) {
+                    $retardMin = $reel->diffInMinutes($prevu);
                 }
             }
 
             return [
-                'Workday ID' => $item->workday_id ,
-                'Agent' => strtoupper($item->nom) . ' ' . $item->prenom, 
-                'email' => $item->work_email ,
-                'Fonction' => $item->fonction,
-                'Date' => $item->planning_entree,
-                'Prévu IN' => $item->planning_entree,
-                'Prévu OUT' => $item->planning_sortie,
-                'Réel IN' => $item->reel_entree,
-                'Réel OUT' => $item->reel_sortie,
-                'Temps Travail' => $this->formatMinutes($item->minutes_travaillees),
-                'Retard' => $this->formatMinutes($retardMinutes),
+                'Workday ID'        => $item->workday_id,
+                'Projet'            => $item->projet_nom, // Nouvelle colonne
+                'Agent'             => strtoupper($item->nom) . ' ' . $item->prenom,
+                'Email'             => $item->work_email,
+                'Fonction'          => $item->fonction ?? 'N/A',
+                'Date'              => Carbon::parse($item->date_pointage)->format('d/m/Y'),
+                'Prévu IN'          => $item->p_in ? Carbon::parse($item->p_in)->format('H:i') : '-',
+                'Prévu OUT'         => $item->p_out ? Carbon::parse($item->p_out)->format('H:i') : '-',
+                'Réel IN'           => $item->a_in ? Carbon::parse($item->a_in)->format('H:i') : '-',
+                'Réel OUT'          => $item->a_out ? Carbon::parse($item->a_out)->format('H:i') : '-',
+                'Temps Travail'     => $this->formatMinutes($item->minutes_travaillees),
+                'Retard'            => $this->formatMinutes($retardMin),
             ];
         });
     }
 
-    /**
-     * Helper de formatage HH:MM
-     */
     private function formatMinutes($totalMinutes)
     {
-        $totalMinutes = round($totalMinutes);
-        if ($totalMinutes <= 0) return "00:00";
-        
+        if (!$totalMinutes || $totalMinutes <= 0) return "00:00";
         $hours = floor($totalMinutes / 60);
         $minutes = $totalMinutes % 60;
-        
         return sprintf('%02d:%02d', $hours, $minutes);
     }
 
@@ -114,16 +106,17 @@ class PointageExport implements FromCollection, WithHeadings, ShouldAutoSize
     {
         return [
             'Workday ID',
-            "Agent", 
+            'Projet', // Nouveau Header
+            'Agent',
             'Email',
             'Fonction',
-            'Date de pointage',
-            "Prévu Entrée", 
-            "Prévu Sortie", 
-            "Réel Entrée", 
-            "Réel Sortie", 
-            "Temps Travail (HH:MM)", 
-            "Retard (HH:MM)"
+            'Date',
+            'Prévu IN',
+            'Prévu OUT',
+            'Réel IN',
+            'Réel OUT',
+            'Temps Travail',
+            'Retard'
         ];
     }
 }

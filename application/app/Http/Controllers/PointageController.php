@@ -45,7 +45,7 @@ class PointageController extends Controller
     /**
      * API AJAX : Données pour le tableau de comparaison (Planning vs Réel)
      */
-    public function getPointageData(Request $request): JsonResponse
+      public function getPointageData(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
@@ -237,16 +237,31 @@ class PointageController extends Controller
     }
 
 
-
-public function exportExcel(Request $request) 
+    public function exportExcel(Request $request) 
 {
-    // On récupère les filtres de la requête
-    $site_id = $request->site_id;
-    $projet_id = $request->projet_id;
-    $week = $request->week;
+    $user = auth()->user();
+    $week = $request->week ?? date('W');
+    
+    // 1. Définition des accès "Full"
+    $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
 
-    $fileName = "Export_Pointage_S{$week}.xlsx";
+    // 2. Restriction pour les Managers
+    $restrictedProjectIds = null;
+    if (!$isFullAccess) {
+        // On récupère uniquement les IDs des projets rattachés à son profil Agent
+        $restrictedProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [0];
+        
+        // Si le manager essaie de forcer un projet_id qui n'est pas à lui dans l'URL
+        if ($request->projet_id && !in_array($request->projet_id, $restrictedProjectIds)) {
+            return abort(403, "Vous n'avez pas accès à ce projet.");
+        }
+    }
 
-    return Excel::download(new PointageExport($site_id, $projet_id, $week), $fileName);
+    $fileName = "Export_Pointage_S{$week}_" . now()->format('Ymd_His') . ".xlsx";
+
+    return Excel::download(
+        new PointageExport($request->site_id, $request->projet_id, $week, $isFullAccess, $restrictedProjectIds), 
+        $fileName
+    );
 }
 }
