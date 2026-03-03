@@ -70,4 +70,26 @@ class Agent extends Model
         return $this->hasMany(Pointage::class, 'agent_id');
     }
     
+    public function roles(): BelongsToMany
+{
+    return $this->belongsToMany(
+        Role::class,
+        'model_has_roles', // table pivot par défaut pour spatie/laravel-permission
+        'model_id',        // clé dans model_has_roles pour Agent
+        'role_id'          // clé de la table roles
+    )->where('model_type', self::class); // obligatoire si tu utilises spatie
+}
+
+
+public function plannings(): HasMany
+{
+    return $this->hasMany(Planning::class, 'agent_id');
+}
+
+public function scopeOnlyManagers(Builder $query): Builder
+    {
+        return $query->whereHas('roles', function($q) {
+            $q->where('name', 'Manager');
+        });
+    }
 }

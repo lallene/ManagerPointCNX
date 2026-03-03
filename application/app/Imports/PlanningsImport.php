@@ -2,92 +2,127 @@
 
 namespace App\Imports;
 
-use App\Models\Planning;
 use App\Models\Agent;
+use App\Models\Planning;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class PlanningsImport implements ToCollection, WithHeadingRow
 {
-    private $week;
+    public $successCount = 0;
+    public $errorMessage = null;
+    protected $week;
 
-    public function __construct($week)
+    // Ajoute le constructeur pour recevoir la semaine
+    public function __construct($week = null)
     {
-        // On s'assure que si on reçoit "8", on stocke "2026-08"
-        // (Adaptation dynamique selon l'année en cours)
-        $this->week = str_contains($week, '-') ? $week : now()->year . '-' . str_pad($week, 2, '0', STR_PAD_LEFT);
+        $this->week = $week;
     }
 
     public function collection(Collection $rows)
     {
-        $authUserId = Auth::id();
+        $user = Auth::user();
+        
+        // 1. 🔐 Vérification des Rôles
+        $isAdmin = $user->hasRole('Admin IT');
+        $isTopManager = $user->hasRole('Top Manager');
+
+        if (!$isAdmin && !$isTopManager) {
+            $this->errorMessage = "Accès refusé : Votre rôle ne permet pas l'importation.";
+            return;
+        }
+
+        // 2. 🌍 Portée (Scope) pour le Top Manager
+        $allowedProjetIds = [];
+        if ($isTopManager && !$isAdmin) {
+            // FIX CRITIQUE : Utilisation de 'work_email' (selon ton Schema users)
+            $currentAgent = Agent::with('projets')
+                ->where('work_email', $user->work_email) 
+                ->first();
+
+            if (!$currentAgent) {
+                $this->errorMessage = "Profil agent introuvable pour l'email : {$user->work_email}";
+                return;
+            }
+            
+            // On récupère la liste des IDs de tous les projets du Top Manager
+            $allowedProjetIds = $currentAgent->projets->pluck('id')->toArray();
+        }
+
         $today = now()->startOfDay();
 
-        $topManager = Agent::with('projets')->where('work_email', Auth::user()->work_email)->first();
-        if (!$topManager) return;
-        
-        $allowedProjetIds = $topManager->projets->pluck('id')->toArray();
-
+        // 3. 🔄 Boucle de traitement des lignes Excel
         foreach ($rows as $row) {
-            if (empty($row['workday_id']) || empty($row['date'])) continue;
+            $workdayId = $row['workday_id'] ?? null;
+            if (!$workdayId) continue;
 
-            $targetAgent = Agent::with('projets')->where('workday_id', $row['workday_id'])->first();
-            if (!$targetAgent) continue;
+            // Eager loading pour éviter le N+1 sur les rôles et projets
+            $targetAgent = Agent::with(['projets', 'user.roles'])
+                ->where('workday_id', $workdayId)
+                ->first();
 
-            $targetAgentProjets = $targetAgent->projets->pluck('id')->toArray();
-            if (empty(array_intersect($allowedProjetIds, $targetAgentProjets))) continue;
+            // 🚨 Règle 1 : Seuls les plannings des MANAGERS peuvent être créés
+            if (!$targetAgent || !$targetAgent->user || !$targetAgent->user->hasRole('Manager')) {
+                continue; 
+            }
 
-            try {
-                if (is_numeric($row['date'])) {
-                    $datePlanning = Carbon::instance(ExcelDate::excelToDateTimeObject($row['date']));
-                } else {
-                    $datePlanning = Carbon::createFromFormat('d/m/Y', $row['date']);
+            // 🚨 Règle 2 : Le Top Manager est restreint à ses projets
+            if ($isTopManager && !$isAdmin) {
+                $targetProjetIds = $targetAgent->projets->pluck('id')->toArray();
+                // Si aucune intersection entre les projets du Top Manager et ceux du Manager cible
+                if (empty(array_intersect($allowedProjetIds, $targetProjetIds))) {
+                    continue; 
                 }
+            }
+
+            // 4. 📅 Parsing et Sauvegarde
+            try {
+                $dateRaw = $row['date'] ?? $row['Date'] ?? null;
+                if (!$dateRaw) continue;
+
+                $datePlanning = is_numeric($dateRaw)
+                    ? Carbon::instance(ExcelDate::excelToDateTimeObject($dateRaw))
+                    : Carbon::createFromFormat('d/m/Y', $dateRaw);
+
+                // Sécurité : Pas de modifications dans le passé
+                if ($datePlanning->startOfDay()->isBefore($today)) continue;
+
+                Planning::updateOrCreate(
+                    [
+                        'agent_id' => $targetAgent->id,
+                        'jour'     => $datePlanning->format('Y-m-d')
+                    ],
+                    [
+                        'entree'  => $this->formatTime($row['entree'] ?? $row['Entrée'] ?? null),
+                        'sortie'  => $this->formatTime($row['sortie'] ?? $row['Sortie'] ?? null),
+                        'semaine' => $datePlanning->format('o-W'),
+                        'user_id' => $user->id,
+                    ]
+                );
+
+                $this->successCount++;
             } catch (\Exception $e) {
-                continue; 
+                \Log::error("Erreur ligne Manager {$workdayId}: " . $e->getMessage());
+                continue;
             }
-
-            if ($datePlanning->startOfDay()->isBefore($today)) {
-                continue; 
-            }
-        
-
-            // Calcul de la semaine ISO basée sur la date réelle du fichier pour éviter les décalages
-            $semaineISO = $datePlanning->format('o-W'); 
-                //        dd($targetAgent->id, $datePlanning->format('Y-m-d'),$this->formatTime($row['entree']), $this->formatTime($row['sortie']), $semaineISO, $authUserId);
-
-
-            Planning::updateOrCreate(
-                [
-                    'agent_id' => $targetAgent->id,
-                    'jour'     => $datePlanning->format('Y-m-d'),
-                ],
-                [
-                    // H:i:s garantit que SQL comprend qu'il s'agit d'un type TIME
-                    'entree'   => $this->formatTime($row['entree']),
-                    'sortie'   => $this->formatTime($row['sortie']),
-                    'semaine'  => $semaineISO, 
-                    'user_id'  => $authUserId,
-                ]
-            );
         }
     }
 
+    /**
+     * Helper pour formater l'heure de manière robuste (Excel ou String)
+     */
     private function formatTime($value)
     {
-        if (empty($value)) return null;
-
+        if (!$value) return null;
         try {
             if (is_numeric($value)) {
-                // Conversion de la fraction Excel (ex: 0.375) en format SQL 09:00:00
-                return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('H:i:s');
+                return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('H:i');
             }
-            // Si c'est une string "09:00", Carbon la transforme en "09:00:00"
-            return Carbon::parse($value)->format('H:i:s');
+            return Carbon::parse($value)->format('H:i');
         } catch (\Exception $e) {
             return null;
         }
