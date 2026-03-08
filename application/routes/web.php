@@ -100,7 +100,7 @@ Route::get('/forgot-password', function () {
 })->name('password.request');
 
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
-
+Route::post('/planning/import-grid', [PlanningController::class, 'importGrid']);
 
 Route::middleware(['auth'])->group(function () {
 
@@ -116,3 +116,4 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
+Route::post('/plannings/paste-import', [PlanningController::class, 'pasteImport'])->name('plannings.paste-import');

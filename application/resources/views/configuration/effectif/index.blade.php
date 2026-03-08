@@ -126,11 +126,6 @@
                                     <i class="fas fa-upload me-1"></i> Importer
                                 </button>
                             </div>
-                            <div class="col-md-5 text-md-end">
-                                <a href="{{ route('effectif.create') }}" class="btn btn-primary btn-sm shadow-sm px-4">
-                                    <i class="fa fa-plus-circle me-1"></i> Ajout Manuel
-                                </a>
-                            </div>
                         </div>
                     </form>
                 </div>

@@ -579,6 +579,126 @@ class PlanningController extends Controller
             'is_oubli' => $is_oubli
         ];
     }
+
+
+
+  public function pasteImport(Request $request)
+{
+    // 1. Validation de base
+    $request->validate([
+        'pasted_data' => 'required',
+        'week' => 'required|integer' 
+    ]);
+
+    $user = auth()->user();
+    $data = $request->input('pasted_data');
+    $today = now()->startOfDay();
+
+    // 2. 🔐 Vérification des Rôles (Identique à l'import Excel)
+    $isAdmin = $user->hasRole('Admin IT');
+    $isTopManager = $user->hasRole('Top Manager');
+
+    if (!$isAdmin && !$isTopManager) {
+        return back()->with('error', "Accès refusé : Votre rôle ne permet pas l'importation.");
+    }
+
+    // 3. 🌍 Portée (Scope) pour le Top Manager
+    $allowedProjetIds = [];
+    if ($isTopManager && !$isAdmin) {
+        $currentAgent = Agent::with('projets')
+            ->where('work_email', $user->work_email) 
+            ->first();
+
+        if (!$currentAgent) {
+            return back()->with('error', "Profil agent introuvable pour l'email : {$user->work_email}");
+        }
+        $allowedProjetIds = $currentAgent->projets->pluck('id')->toArray();
+    }
+
+    $lines = explode("\n", str_replace("\r", "", trim($data)));
+    $successCount = 0;
+    $errors = [];
+
+    foreach ($lines as $index => $line) {
+        $columns = explode("\t", $line);
+
+        // Ignorer l'en-tête
+        if ($index === 0 && (str_contains(strtolower($columns[0]), 'id') || str_contains(strtolower($columns[1]), 'date'))) {
+            continue;
+        }
+
+        if (count($columns) >= 2) {
+            try {
+                $workdayIdExcel = trim($columns[0]); 
+                $rawDate = trim($columns[1]);
+                
+                // 4. Recherche de l'agent cible et vérification des droits
+                $targetAgent = Agent::with(['projets', 'user.roles'])
+                    ->where('workday_id', $workdayIdExcel)
+                    ->first();
+
+                // Règle : Agent existant et rôle Manager
+                if (!$targetAgent || !$targetAgent->user || !$targetAgent->user->hasRole('Manager')) {
+                    throw new \Exception("Agent non trouvé ou n'est pas un Manager (ID: $workdayIdExcel)");
+                }
+
+                // Règle : Restriction projet pour Top Manager
+                if ($isTopManager && !$isAdmin) {
+                    $targetProjetIds = $targetAgent->projets->pluck('id')->toArray();
+                    if (empty(array_intersect($allowedProjetIds, $targetProjetIds))) {
+                        throw new \Exception("Vous n'avez pas les droits sur le projet de cet agent (ID: $workdayIdExcel)");
+                    }
+                }
+
+                // 5. Traitement de la Date
+                try {
+                    $dateObj = str_contains($rawDate, '/') 
+                        ? \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)
+                        : \Carbon\Carbon::parse($rawDate);
+                } catch (\Exception $e) {
+                    throw new \Exception("Date invalide : $rawDate");
+                }
+
+                // Sécurité : Pas de modifications dans le passé (comme dans ton Excel)
+                if ($dateObj->startOfDay()->isBefore($today)) {
+                    continue; 
+                }
+
+                // 6. Formatage Heures et Semaine
+                $entree = !empty($columns[2]) && strtoupper(trim($columns[2])) !== 'OFF' ? trim($columns[2]) : null;
+                $sortie = !empty($columns[3]) && strtoupper(trim($columns[3])) !== 'OFF' ? trim($columns[3]) : null;
+                $weekISO = $dateObj->format('o-W');
+
+                // 7. Sauvegarde
+                \App\Models\Planning::updateOrCreate(
+                    [
+                        'agent_id' => $targetAgent->id,
+                        'jour'     => $dateObj->format('Y-m-d')
+                    ],
+                    [
+                        'entree'   => $entree,
+                        'sortie'   => $sortie,
+                        'semaine'  => $weekISO,
+                        'user_id'  => $user->id
+                    ]
+                );
+
+                $successCount++;
+            } catch (\Exception $e) {
+                $errors[] = "Ligne " . ($index + 1) . " : " . $e->getMessage();
+            }
+        }
+    }
+
+    // 8. Feedback
+    if (count($errors) > 0) {
+        $errorPreview = implode(' | ', array_slice($errors, 0, 2));
+        return back()->with('error', "$successCount importés. Erreurs : $errorPreview" . (count($errors) > 2 ? "..." : ""));
+    }
+
+    return back()->with('success', "Importation réussie : $successCount lignes de planning traitées.");
+}
+
 }
 
 
