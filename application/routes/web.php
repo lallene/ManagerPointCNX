@@ -10,7 +10,8 @@ use App\Http\Controllers\PointageController;
 use App\Http\Controllers\ProjetController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UtilisateurController;
-
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Auth\ResetPasswordController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -96,9 +97,7 @@ Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function 
     Route::resource('users', UtilisateurController::class);
 });
 
-Route::get('/forgot-password', function () {
-    return "Veuillez contacter l'administrateur IT pour réinitialiser votre mot de passe.";
-})->name('password.request');
+
 
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
 Route::post('/planning/import-grid', [PlanningController::class, 'importGrid']);
@@ -118,3 +117,16 @@ Route::middleware(['auth'])->group(function () {
 
 
 Route::post('/plannings/paste-import', [PlanningController::class, 'pasteImport'])->name('plannings.paste-import');
+
+
+Route::get('forgot-password', [ForgotPasswordController::class, 'showLinkRequestForm'])
+        ->name('password.request');
+
+Route::post('forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail'])
+        ->name('password.email');
+
+Route::get('reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])
+        ->name('password.reset');
+
+Route::post('reset-password', [ResetPasswordController::class, 'reset'])
+        ->name('password.update');

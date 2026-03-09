@@ -211,8 +211,11 @@
                     <input class="form-check-input" type="checkbox" name="remember" id="remember">
                     <label class="form-check-label small text-muted" for="remember">Rester connecté</label>
                 </div>
-                <a class="small text-link fw-semibold" href="#"
-                    style="color: var(--cnx-teal); text-decoration: none;">Oublié ?</a>
+               <a class="small text-link fw-semibold"
+                href="{{ route('password.request') }}"
+                style="color: var(--cnx-teal); text-decoration: none;">
+                Mot de passe oublié ?
+                </a>
             </div>
 
             <button type="submit" class="btn btn-primary w-100 mb-3" id="submitBtn">
