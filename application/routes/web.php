@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/api/data', [PointageController::class, 'getPointageData'])->name('pointage.api.data');
         Route::get('/api/projets-by-site', [PointageController::class, 'getProjetsBySite'])->name('api.projets.by.site');
         Route::get('/group', [PointageController::class, 'index'])->name('index');
+        Route::get('/data', [PointageController::class, 'apiData'])->name('api.data');
 Route::get('/pointage/export/excel', [PointageController::class, 'exportExcel'])->name('pointage.export.excel');
 
     });
