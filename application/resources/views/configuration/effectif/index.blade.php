@@ -61,6 +61,14 @@
             padding: 0.4em 0.8em;
             text-transform: uppercase;
             border-radius: 4px;
+            display: inline-block;
+            white-space: nowrap; /* Empêche le texte d'un badge de se couper en deux */
+        }
+
+        /* Force la cellule du tableau à accepter les retours à la ligne */
+        #agentTable td:nth-child(6) {
+            white-space: normal !important;
+            min-width: 250px;
         }
 
         .fonction-tag {
@@ -108,7 +116,6 @@
         </div>
 
         <div class="card shadow-sm border-0 mb-5">
-            {{-- Section d'importation : Visible uniquement pour le Board --}}
             @if (auth()->user()->hasAnyRole(['RH', 'IT', 'Directeur']))
                 <div class="import-section">
                     <form action="{{ route('effectif.import') }}" method="POST" enctype="multipart/form-data">
@@ -143,7 +150,6 @@
                                 <th>Email Professionnel</th>
                                 <th>Projet(s)</th>
                                 <th>Responsable Direct</th>
-                                {{-- Colonne action visible uniquement pour RH ou Admin --}}
                                 @if (auth()->user()->hasAnyRole(['RH', 'IT']))
                                     <th class="text-center">Actions</th>
                                 @endif
@@ -167,10 +173,10 @@
 
         <script>
             $(document).ready(function() {
-                // Définition des droits côté JS
-                const canEdit = {{ auth()->user()->hasAnyRole(['RH', 'IT'])? 'true': 'false' }};
+                const canEdit = {{ auth()->user()->hasAnyRole(['RH', 'IT']) ? 'true' : 'false' }};
 
-                let columnsConfig = [{
+                let columnsConfig = [
+                    {
                         data: 'site',
                         name: 'site',
                         className: 'text-center',
@@ -193,33 +199,38 @@
                     {
                         data: 'fonction',
                         name: 'fonction',
-                        render: data =>
-                            `<span class="fonction-tag"><i class="fas fa-id-badge me-1 opacity-50"></i>${data}</span>`
+                        render: data => `<span class="fonction-tag"><i class="fas fa-id-badge me-1 opacity-50"></i>${data}</span>`
                     },
                     {
                         data: 'work_email',
                         name: 'work_email',
-                        render: data =>
-                            `<span class="small text-muted"><i class="far fa-envelope me-1"></i>${data}</span>`
+                        render: data => `<span class="small text-muted"><i class="far fa-envelope me-1"></i>${data}</span>`
                     },
                     {
                         data: 'projet',
                         name: 'projet',
                         render: data => {
                             if (!data) return '-';
-                            return data.split(',').map(p =>
-                                `<span class="badge badge-projet mb-1">${p.trim()}</span>`).join(' ');
+                            const projets = data.split(',');
+                            let output = '';
+                            
+                            projets.forEach((p, index) => {
+                                output += `<span class="badge badge-projet mb-1">${p.trim()}</span> `;
+                                // On force un retour à la ligne toutes les 3 itérations
+                                if ((index + 1) % 3 === 0) {
+                                    output += '<br>';
+                                }
+                            });
+                            return output;
                         }
                     },
                     {
                         data: 'manager_nom',
                         name: 'manager_nom',
-                        render: data =>
-                            `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`
+                        render: data => `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`
                     }
                 ];
 
-                // Ajout de la colonne action si l'utilisateur a les droits
                 if (canEdit) {
                     columnsConfig.push({
                         data: null,
@@ -247,20 +258,13 @@
                     ajax: "{{ route('effectif.ajax') }}",
                     columns: columnsConfig,
                     dom: '<"d-flex justify-content-between align-items-center mb-3"lBf>rtip',
-                    buttons: [{
-                            extend: 'excel',
-                            className: 'btn btn-outline-success btn-sm',
-                            text: '<i class="fas fa-file-excel me-1"></i> Excel'
-                        },
-                        {
-                            extend: 'pdf',
-                            className: 'btn btn-outline-danger btn-sm',
-                            text: '<i class="fas fa-file-pdf me-1"></i> PDF'
-                        }
+                    buttons: [
+                        { extend: 'excel', className: 'btn btn-outline-success btn-sm', text: '<i class="fas fa-file-excel me-1"></i> Excel' },
+                        { extend: 'pdf', className: 'btn btn-outline-danger btn-sm', text: '<i class="fas fa-file-pdf me-1"></i> PDF' }
                     ],
                     pageLength: 25,
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json"
+                        url: "{{ asset('js/datatables-fr.json') }}"
                     }
                 });
             });
@@ -270,7 +274,10 @@
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url;
-                    form.innerHTML = `@csrf @method('DELETE')`;
+                    form.innerHTML = `
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="_method" value="DELETE">
+                    `;
                     document.body.appendChild(form);
                     form.submit();
                 }

@@ -163,96 +163,96 @@ class PlanningController extends Controller
      */
     
 
-        public function getPlanningData(Request $request): JsonResponse
-    {
-        try {
-            $user = Auth::user();
-            // Correction ici : Un Top Manager n'a pas forcément FullAccess, il est restreint à ses projets
-            $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
+    public function getPlanningData(Request $request): JsonResponse
+{
+    try {
+        $user = Auth::user();
+        $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
 
-            $rawWeek = $request->input('week', now()->format('Y-W')); 
-            $parts = explode('-', str_replace('-W', '-', $rawWeek));
-            $year = (int)$parts[0];
-            $weekNum = (int)($parts[1] ?? now()->weekOfYear); 
+        $rawWeek = $request->input('week', now()->format('Y-W')); 
+        $parts = explode('-', str_replace('-W', '-', $rawWeek));
+        $year = (int)$parts[0];
+        $weekNum = (int)($parts[1] ?? now()->weekOfYear); 
 
-            $formatSimple = $year . '-' . $weekNum;
-            $formatZero   = $year . '-' . str_pad($weekNum, 2, '0', STR_PAD_LEFT); 
+        $dateDebut = Carbon::now()->setISODate($year, $weekNum)->startOfWeek();
+        $dates = [];
+        for ($i = 0; $i < 7; $i++) { $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d'); }
 
-            $dateDebut = Carbon::now()->setISODate($year, $weekNum)->startOfWeek();
-            $dates = [];
-            for ($i = 0; $i < 7; $i++) { $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d'); }
+        // 1. Chargement des projets et agents
+        $queryProjets = Projet::with(['agents' => function($q) use ($dates) {
+            $q->whereHas('user', fn($uq) => $uq->role('Manager'))
+              ->with(['plannings' => function($pq) use ($dates) {
+                  $pq->whereIn('jour', $dates);
+              }])
+              ->with(['pointages' => function($ptq) use ($dates) {
+                  $ptq->whereIn('date_pointage', $dates);
+              }]);
+        }]);
 
-            // 1. Récupération des projets autorisés (Eager Loading des agents pour éviter le N+1)
-            $queryProjets = Projet::with(['agents' => function($q) {
-                $q->whereHas('user', fn($uq) => $uq->role('Manager'));
-            }]);
-
-            if ($isFullAccess) {
-                if ($request->filled('site_id')) $queryProjets->where('site_id', $request->get('site_id'));
-                if ($request->filled('projet_id') && $request->get('projet_id') !== 'null') $queryProjets->where('id', $request->get('projet_id'));
-            } else {
-                // Le Top Manager ne voit que les projets où il est lui-même affecté
-                $queryProjets->whereHas('agents', fn($q) => $q->where('work_email', $user->work_email));
-            }
-            $projets = $queryProjets->get();
-
-            // 2. Pré-chargement massif des données pour la performance
-            $allAgentIds = $projets->pluck('agents.*.id')->flatten()->unique();
-            $allPlannings = Planning::whereIn('agent_id', $allAgentIds)
-                ->whereIn('semaine', [$formatSimple, $formatZero])
-                ->get()
-                ->groupBy('agent_id');
-
-            // Pré-récupération de tous les "Boss" (Top Managers) en une seule requête
-            $managerIds = $projets->pluck('agents.*.manager')->flatten()->filter()->unique();
-            $allBosses = Agent::whereIn('workday_id', $managerIds)->get()->keyBy('workday_id');
-
-            $resultat = [];
-            foreach ($projets as $projet) {
-                $groupes = [];
-                foreach ($projet->agents as $agent) {
-                    // On récupère le boss depuis notre collection en mémoire (Vitesse ++ )
-                    $boss = $allBosses->get($agent->manager);
-                    $bossName = $boss ? "{$boss->prenom} {$boss->nom}" : "Direction / Autre";
-                    
-                    if (!isset($groupes[$bossName])) {
-                        $groupes[$bossName] = ['manager' => $bossName, 'agents' => []];
-                    }
-
-                    $statsPlanning = [];
-                    $agentPlannings = $allPlannings->get($agent->id) ?? collect();
-                    
-                    foreach ($dates as $date) {
-                        // On compare les dates proprement
-                        $p = $agentPlannings->first(fn($v) => Carbon::parse($v->jour)->format('Y-m-d') === $date);
-                        $statsPlanning[$date] = [
-                            'in'  => ($p && $p->entree) ? Carbon::parse($p->entree)->format('H:i') : null,
-                            'out' => ($p && $p->sortie) ? Carbon::parse($p->sortie)->format('H:i') : null,
-                        ];
-                    }
-
-                    $groupes[$bossName]['agents'][] = [
-                        'nom' => $agent->nom, 
-                        'prenom' => $agent->prenom, 
-                        'fonction' => $agent->fonction ?? 'MANAGER', 
-                        'planning' => $statsPlanning
-                    ];
-                }
-                if (!empty($groupes)) {
-                    $resultat[] = [
-                        'site' => $projet->site_id, 
-                        'projet' => $projet->designation, 
-                        'groupes' => array_values($groupes)
-                    ];
-                }
-            }
-            return response()->json(['dates' => $dates, 'resultat' => $resultat]);
-
-        } catch (\Exception $e) {
-            Log::error("API Hebdo Error: " . $e->getMessage());
-            return response()->json(['error' => "Erreur lors du chargement des données."], 500);
+        if ($isFullAccess) {
+            if ($request->filled('site_id')) $queryProjets->where('site_id', $request->get('site_id'));
+            if ($request->filled('projet_id') && $request->get('projet_id') !== 'null') $queryProjets->where('id', $request->get('projet_id'));
+        } else {
+            $queryProjets->whereHas('agents', fn($q) => $q->where('work_email', $user->work_email));
         }
+
+        $projets = $queryProjets->get();
+        $resultat = [];
+
+        foreach ($projets as $projet) {
+            $agentsFormatted = [];
+            foreach ($projet->agents as $agent) {
+                $statsParDate = [];
+                foreach ($dates as $date) {
+                    $p = $agent->plannings->first(fn($v) => Carbon::parse($v->jour)->format('Y-m-d') === $date);
+                    $pt = $agent->pointages->first(fn($v) => Carbon::parse($v->date_pointage)->format('Y-m-d') === $date);
+
+                    $ecart = "00:00";
+                    $status = 'normal';
+                    
+                    // Calcul simple de l'écart si pointage réel existe
+                    if ($p && $pt && $pt->entree && $pt->sortie) {
+                        $theo = Carbon::parse($p->entree)->diffInMinutes(Carbon::parse($p->sortie));
+                        $reel = Carbon::parse($pt->entree)->diffInMinutes(Carbon::parse($pt->sortie));
+                        $diff = $reel - $theo;
+                        $status = $diff < 0 ? 'deficit' : 'surplus';
+                        $ecart = sprintf('%02d:%02d', abs(floor($diff / 60)), abs($diff % 60));
+                    }
+
+                    $statsParDate[$date] = [
+                        'p_in'  => $p ? Carbon::parse($p->entree)->format('H:i') : null,
+                        'p_out' => $p ? Carbon::parse($p->sortie)->format('H:i') : null,
+                        'a_in'  => $pt ? Carbon::parse($pt->entree)->format('H:i') : null,
+                        'a_out' => $pt ? Carbon::parse($pt->sortie)->format('H:i') : null,
+                        'ecart' => ($ecart !== "00:00") ? $ecart : null,
+                        'status'=> $status,
+                        'retard'=> ($pt && $p && Carbon::parse($pt->entree)->gt(Carbon::parse($p->entree)->addMinutes(5))) ? 
+                                    Carbon::parse($pt->entree)->diff(Carbon::parse($p->entree))->format('%H:%I') : null
+                    ];
+                }
+
+                $agentsFormatted[] = [
+                    'nom' => "{$agent->prenom} {$agent->nom}",
+                    'fonction' => $agent->fonction,
+                    'stats' => $statsParDate
+                ];
+            }
+
+            if (!empty($agentsFormatted)) {
+                $resultat[] = [
+                    'projet' => $projet->designation,
+                    'superviseurs' => $agentsFormatted // On utilise 'superviseurs' pour matcher le JS
+                ];
+            }
+        }
+
+        return response()->json(['dates' => $dates, 'resultat' => $resultat]);
+
+    } catch (\Exception $e) {
+        Log::error("API Hebdo Error: " . $e->getMessage());
+        return response()->json(['error' => $e->getMessage()], 500);
     }
+}
 
     /**
      * Affiche la page du Graphique Journalier

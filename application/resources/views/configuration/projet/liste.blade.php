@@ -203,10 +203,11 @@
             const isRH = {{ auth()->user()->hasRole('RH') ? 'true' : 'false' }};
             const groupColumn = 0;
 
+            // Définition des colonnes
             let columnsDef = [{
                     data: 'site_nom',
                     name: 'sites.designation',
-                    visible: false // Colonne de groupement
+                    visible: false // Colonne utilisée pour le groupement visuel uniquement
                 },
                 {
                     data: 'msa_id',
@@ -231,6 +232,7 @@
                 }
             ];
 
+            // Ajout de la colonne Action si l'utilisateur est RH
             if (isRH) {
                 columnsDef.push({
                     data: 'action',
@@ -257,7 +259,8 @@
                 }],
                 pageLength: 50,
                 language: {
-                    url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json"
+                    // Correction : Utilisation du fichier local pour éviter l'erreur CORS
+                    url: "{{ asset('js/datatables-fr.json') }}"
                 },
                 drawCallback: function(settings) {
                     const api = this.api();
@@ -267,6 +270,7 @@
                     let last = null;
                     const dynamicColspan = isRH ? 4 : 3;
 
+                    // Logique de groupement par Site
                     api.column(groupColumn, {
                         page: 'current'
                     }).data().each(function(group, i) {
@@ -290,11 +294,12 @@
                         }
                     });
 
-                    // Mise à jour des compteurs Stats
+                    // Mise à jour des compteurs statistiques en haut de page
                     const info = api.page.info();
                     $('#totalProjets').text(info.recordsTotal);
-                    const uniqueSites = [...new Set(api.column(groupColumn).data().toArray())].filter(
-                        n => n);
+                    
+                    // Note: uniqueSites calcule les sites visibles sur la PAGE actuelle
+                    const uniqueSites = [...new Set(api.column(groupColumn, {page:'current'}).data().toArray())].filter(n => n);
                     $('#totalSites').text(uniqueSites.length);
                 }
             });
