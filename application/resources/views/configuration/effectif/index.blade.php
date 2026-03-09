@@ -103,13 +103,7 @@
             <div class="col-md-12">
                 <div class="column_title">
                     <h2>{{ $titre }}</h2>
-                    @if (auth()->user()->hasAnyRole(['RH', 'IT', 'Directeur']))
-                        <div class="breadcrumb-custom">
-                            <a href="{{ asset('templates/masque_import_agents.xlsx') }}"
-                                class="btn btn-template btn-sm px-3 shadow-sm">
-                                <i class="fas fa-download me-2"></i> Télécharger le modèle Excel
-                            </a>
-                        </div>
+                    @if (auth()->user()->hasAnyRole(['RH', 'IT', 'Directeur'])) 
                     @endif
                 </div>
             </div>

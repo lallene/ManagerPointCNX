@@ -57,6 +57,7 @@ class PlanningController extends Controller
             'a.prenom',
             'a.nom',
             'a.fonction',
+            'a.workday_id',
             'r.name as role_name',
             'p.designation as nom_projet',
             DB::raw("COALESCE(CONCAT(mgr.prenom, ' ', mgr.nom), 'Direction') as nom_manager")
@@ -72,7 +73,7 @@ class PlanningController extends Controller
 
         $agents = $agents->filter(fn($a) => in_array($a->fonction, $fonctionsChoisies));
 
-
+        //dd($agents);
 
         $agentIds = $agents->pluck('id')->unique();
         $plannings = DB::table('plannings')

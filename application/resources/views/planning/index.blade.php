@@ -203,7 +203,7 @@
                                         <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ $agent->prenom }} {{ $agent->nom }}</div>
                                         <div class="d-flex flex-wrap gap-1 mt-1">
                                             <span class="badge bg-light text-primary border" style="font-size: 0.6rem;">{{ $agent->fonction }}</span>
-                                            <span class="badge bg-light text-muted border" style="font-size: 0.6rem;">M: {{ $agent->nom_manager }}</span>
+                                            <span class="badge bg-light text-muted border" style="font-size: 0.6rem;">ID: {{ $agent->workday_id }}</span>
                                         </div>
                                     </td>
                                     @foreach (range(0, 6) as $i)
