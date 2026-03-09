@@ -1,13 +1,18 @@
 @extends('layouts.app')
 
 @section('link')
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css" />
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+
     <style>
         :root {
             --bg-light: #f8fafc;
             --card-bg: #ffffff;
-            --accent-green: #2ECC71; /* Couleur réelle de production */
+            --accent-green: #2ECC71;
             --accent-green-dark: #27ae60;
-            --theo-gray: rgba(226, 232, 240, 0.5); /* Couleur de l'intervalle théorique */
+            --theo-gray: rgba(226, 232, 240, 0.6);
             --pause-gold: #F1C40F;
             --danger-red: #E74C3C;
             --hour-h: 60px;
@@ -92,16 +97,7 @@
             border: 1px dashed #cbd5e1;
             border-radius: 8px;
             z-index: 5;
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-        }
-
-        .theoretical-label {
-            font-size: 8px;
-            color: #94a3b8;
-            margin-top: -15px;
-            font-weight: bold;
+            cursor: help;
         }
 
         .block-work {
@@ -111,15 +107,17 @@
             background: linear-gradient(180deg, var(--accent-green) 0%, var(--accent-green-dark) 100%);
             color: white;
             border-radius: 6px;
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             font-weight: 700;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 10;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: help;
+            transition: transform 0.1s;
         }
+        .block-work:hover { transform: scale(1.02); z-index: 100; }
 
         .block-pause {
             position: absolute;
@@ -133,6 +131,7 @@
             justify-content: center;
             color: white;
             z-index: 15;
+            cursor: help;
         }
 
         .block-anomaly {
@@ -159,12 +158,18 @@
             pointer-events: none;
         }
         .now-line-custom::before {
-            content: 'NOW';
+            content: 'DIRECT';
             position: absolute;
             left: 0; top: -10px;
             background: #ef4444; color: white;
             font-size: 9px; padding: 1px 4px; border-radius: 0 4px 4px 0;
             font-weight: bold;
+        }
+
+        /* Tooltip Custom Style */
+        .tippy-box[data-theme~='light'] {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
         }
     </style>
 @endsection
@@ -177,10 +182,10 @@
             <div class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="small fw-bold text-muted">CHERCHER</label>
-                    <input type="text" id="manager_search" class="form-control form-control-sm" placeholder="Nom...">
+                    <input type="text" id="manager_search" class="form-control form-control-sm" placeholder="Nom du manager...">
                 </div>
                 <div class="col-md-2">
-                    <label class="small fw-bold text-muted">DATE CIBLE</label>
+                    <label class="small fw-bold text-muted">DATE</label>
                     <input type="date" id="target_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" onchange="loadData()">
                 </div>
                 <div class="col-md-3">
@@ -202,7 +207,7 @@
 
         <div id="graph-zone" class="graph-frame">
             <div class="p-5 text-center text-muted">
-                <div class="spinner-border spinner-border-sm me-2"></div> Chargement...
+                <div class="spinner-border spinner-border-sm me-2"></div> Chargement de la timeline...
             </div>
         </div>
     </div>
@@ -230,17 +235,16 @@
                 allData = Array.isArray(data) ? data : (data.data || []);
                 renderMain(allData);
             }).fail(() => {
-                $('#graph-zone').html('<div class="alert alert-danger m-3">Erreur serveur.</div>');
+                $('#graph-zone').html('<div class="alert alert-danger m-3">Erreur lors de la récupération des données.</div>');
             });
         }
 
         function renderMain(data) {
             if (!data.length) {
-                $('#graph-zone').html('<div class="p-5 text-center text-muted">Aucune donnée trouvée</div>');
+                $('#graph-zone').html('<div class="p-5 text-center text-muted">Aucune donnée pour cette sélection</div>');
                 return;
             }
 
-            // Flatten for KPIs
             let flatManagers = [];
             data.forEach(p => p.top_managers.forEach(tm => tm.managers.forEach(m => flatManagers.push(m))));
             updateKPIs(flatManagers);
@@ -271,38 +275,54 @@
                 });
                 html += `</div>`;
             });
+
             $('#graph-zone').html(html);
             updateNowIndicator();
+
+            // Initialisation des infobulles Tippy
+            tippy('[data-tippy-content]', {
+                allowHTML: true,
+                theme: 'light',
+                placement: 'top',
+                arrow: true,
+                animation: 'fade',
+            });
         }
 
         function renderManager(m) {
             let realContent = '', pauses = '', anomalies = '', theoContent = '';
             const nowF = new Date().getHours() + (new Date().getMinutes() / 60);
 
-            // 1. INTERVALLE THÉORIQUE (Planning)
-            let st = m.debut_theorique || "08:00";
-            let et = m.fin_theorique || "17:00";
+            // 1. PLANNING THÉORIQUE
+            let st = m.debut_theorique || "08:00", et = m.fin_theorique || "17:00";
             let stF = tToF(st), etF = tToF(et);
-
             if (stF) {
-                theoContent = `
-                <div class="theoretical-slot" style="top:${(stF - START_H) * PX_H}px; height:${(etF - stF) * PX_H}px;">
-                    <span class="theoretical-label">${st} - ${et}</span>
-                </div>`;
+                theoContent = `<div class="theoretical-slot" 
+                    data-tippy-content="<b>Planning Prévu</b><br>${st} - ${et}"
+                    style="top:${(stF - START_H) * PX_H}px; height:${(etF - stF) * PX_H}px;"></div>`;
             }
 
-            // 2. SEGMENTS RÉELS
+            // 2. SEGMENTS RÉELS (Production)
             if (m.segments) {
                 m.segments.forEach(s => {
                     let sF = tToF(s.start), eF = (s.end && s.end !== '--:--') ? tToF(s.end) : nowF;
+                    let isLive = !(s.end && s.end !== '--:--');
                     if (sF) {
                         let top = (sF - START_H) * PX_H;
-                        let h = Math.max((eF - sF) * PX_H, 5);
+                        let h = Math.max((eF - sF) * PX_H, 12);
+                        
+                        let tooltip = `
+                            <div class='text-start'>
+                                <b class='text-success'>PRODUCTION</b><br>
+                                <b>Début :</b> ${s.start}<br>
+                                <b>Fin :</b> ${isLive ? "<span class='badge bg-danger'>EN COURS</span>" : s.end}<br>
+                                <hr class='my-1'>
+                                <b>Durée :</b> ${(eF - sF).toFixed(2)}h
+                            </div>`;
+
                         realContent += `
-                        <div class="block-work" style="top:${top}px; height:${h}px;">
-                            <span style="font-size:7px; opacity:0.8;">${s.start}</span>
-                            <div>${(eF - sF).toFixed(1)}h</div>
-                            <span style="font-size:7px; opacity:0.8;">${(s.end && s.end !== '--:--') ? s.end : 'LIVE'}</span>
+                        <div class="block-work" data-tippy-content="${tooltip}" style="top:${top}px; height:${h}px;">
+                            <span>${(eF - sF).toFixed(1)}h</span>
                         </div>`;
                     }
                 });
@@ -313,14 +333,17 @@
                 m.pauses.forEach(p => {
                     let psF = tToF(p.start), peF = tToF(p.end) || nowF;
                     if (psF) {
-                        pauses += `<div class="block-pause" style="top:${(psF - START_H) * PX_H}px; height:${Math.max((peF - psF) * PX_H, 15)}px; background:${p.minutes > 60 ? 'var(--danger-red)' : 'var(--pause-gold)'};">
-                            ${p.minutes}m
+                        let tooltipPause = `<b>Pause :</b> ${p.start} - ${p.end || 'En cours'}<br><b>Durée :</b> ${p.minutes} min`;
+                        pauses += `<div class="block-pause" 
+                            data-tippy-content="${tooltipPause}"
+                            style="top:${(psF - START_H) * PX_H}px; height:${Math.max((peF - psF) * PX_H, 15)}px; background:${p.minutes > 60 ? 'var(--danger-red)' : 'var(--pause-gold)'};">
+                            ${p.minutes}'
                         </div>`;
                     }
                 });
             }
 
-            // 4. ANOMALIES (RETARD)
+            // 4. RETARD
             if (m.start_status === 'RETARD') {
                 anomalies += `<div class="block-anomaly bg-danger" style="top:${(tToF(m.real_start) - START_H) * PX_H - 22}px; height:20px;">RETARD</div>`;
             }
@@ -329,9 +352,9 @@
             <div class="manager-col">
                 <div class="manager-head text-center">
                     <div class="fw-bold text-truncate" style="font-size:0.8rem;">${m.nom}</div>
-                    <div class="text-muted small" style="font-size:0.65rem;">${m.role || 'AGENT'}</div>
+                    <div class="text-muted small" style="font-size:0.65rem;">${m.role || 'MANAGER'}</div>
                     <div class="badge ${m.start_status === 'RETARD' ? 'bg-danger' : 'bg-success'} mt-1" style="font-size:0.6rem;">
-                        IN: ${m.real_start || '--:--'}
+                        LOG: ${m.real_start || '--:--'}
                     </div>
                 </div>
                 <div class="position-relative h-100">
@@ -358,10 +381,9 @@
         }
 
         function updateKPIs(managers) {
-            let k = { total: managers.length, retards: 0, exits: 0, hours: 0 };
+            let k = { total: managers.length, retards: 0, hours: 0 };
             managers.forEach(m => {
                 if (m.start_status === 'RETARD') k.retards++;
-                if (m.end_status === 'DEPART_ANTICIPE') k.exits++;
                 if (m.segments) m.segments.forEach(s => {
                     let sF = tToF(s.start), eF = (s.end && s.end !== '--:--') ? tToF(s.end) : (new Date().getHours() + new Date().getMinutes()/60);
                     k.hours += Math.max(0, eF - sF);
@@ -371,14 +393,17 @@
             $('#kpi-container').html(`
                 <div class="kpi-card"><h6>Managers</h6><h3>${k.total}</h3></div>
                 <div class="kpi-card"><h6>Retards</h6><h3 class="text-danger">${k.retards}</h3></div>
-                <div class="kpi-card"><h6>Départs Ant.</h6><h3>${k.exits}</h3></div>
-                <div class="kpi-card"><h6>Prod Totale</h6><h3 class="text-success">${k.hours.toFixed(1)}h</h3></div>
+                <div class="kpi-card"><h6>Heures Prod.</h6><h3 class="text-success">${k.hours.toFixed(1)}h</h3></div>
             `);
         }
 
         $(document).ready(() => {
             loadData();
-            setInterval(updateNowIndicator, 60000);
+            setInterval(() => {
+                updateNowIndicator();
+                // Optionnel: rafraîchir les données toutes les 5 mins
+            }, 60000);
+
             $('#manager_search').on('input', function() {
                 const val = $(this).val().toLowerCase();
                 $('.manager-col').each(function() {
