@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
          $this->call([
           
             // 2. On crée l'utilisateur Admin par défaut
-            PointageTableSeeder::class,
+            RoleAndAdminSeeder::class,
             
         ]);
     }

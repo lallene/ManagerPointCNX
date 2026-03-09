@@ -14,7 +14,7 @@ class DashboardController extends Controller
 {
     // 1. Initialisation des Filtres
     $debut = $request->input('debut', now()->startOfWeek()->format('Y-m-d'));
-    $fin   = $request->input('fin', now()->endOfWeek()->format('Y-m-d'));
+    $fin   = $request->input('fin', now()->startOfWeek()->format('Y-m-d'));
    $site_id = $request->input('site_id'); // <--- IL MANQUAIT CETTE LIGNE
     $projet_id = $request->input('projet_id');
 

@@ -195,7 +195,7 @@
                 <div class="input-group">
                     <span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
                     <input id="password" type="password" class="form-control @error('password') is-invalid @enderror"
-                        name="password" placeholder="••••••••" required>
+                        name="password"  required>
                     <button class="btn btn-outline-secondary border-start-0" type="button" id="togglePassword"
                         style="border-color: #dee2e6;">
                         <i class="fa-regular fa-eye" id="eyeIcon"></i>

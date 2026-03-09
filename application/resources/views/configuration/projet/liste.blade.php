@@ -125,9 +125,7 @@
         <div class="column_title shadow-sm">
             <h2 class="mb-0">{{ $titre ?? 'Gestion du Référentiel' }}</h2>
             <div class="breadcrumb-custom">
-                <a href="{{ asset('templates/masque_import_projets.xlsx') }}" class="btn btn-template btn-sm px-3 shadow-sm">
-                    <i class="fas fa-download me-2"></i> Télécharger le modèle Excel
-                </a>
+                
             </div>
         </div>
 
@@ -136,20 +134,7 @@
             <div class="import-section">
                 <div class="row align-items-center g-3">
                     @if (auth()->user()->hasRole('RH'))
-                        <div class="col-md-7 border-end">
-                            <form action="{{ route('projet.import') }}" method="POST" enctype="multipart/form-data">
-                                @csrf
-                                <label class="label-recherche">
-                                    <i class="fas fa-upload me-2 text-success"></i>Mise à jour du Référentiel
-                                </label>
-                                <div class="input-group">
-                                    <input type="file" name="file" class="form-control form-control-sm" required>
-                                    <button type="submit" class="btn btn-success btn-sm px-4 shadow-sm">
-                                        <i class="fas fa-check-circle me-1"></i> Importer
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        
                     @endif
 
                     <div class="col-md-5">
