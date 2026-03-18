@@ -41,7 +41,7 @@ class PointageExport implements FromCollection, WithHeadings, ShouldAutoSize, Wi
         }
 
         if ($this->site_id) {
-            $query->where('agents.site_id', $this->site_id);
+            $query->where('projets.site_id', $this->site_id);
         }
 
         if ($this->projet_id && $this->projet_id !== 'null') {
