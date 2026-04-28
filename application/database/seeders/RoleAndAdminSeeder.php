@@ -33,10 +33,10 @@ class RoleAndAdminSeeder extends Seeder
         // 2. CRÉATION DU COMPTE SUPER ADMIN (TOI)
         // Remplace par tes vraies infos
         $admin = User::updateOrCreate(
-            ['work_email' => 'admin@concentrix.com'], 
+            ['work_email' => 'test@concentrix.com'], 
             [
-                'name' => 'ADMIN IT',
-                'password' => Hash::make('Admin2026!'), 
+                'name' => 'Test',
+                'password' => Hash::make('password'), 
                 'password_first_connection' => false, 
                 'email_verified_at' => now(),
             ]

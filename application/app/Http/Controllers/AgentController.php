@@ -26,86 +26,146 @@ class AgentController extends Controller
     private string $templatePath = 'configuration.effectif';
     private string $link = 'effectif';
 
-    
-public function index(Request $request): View
-{
-    $user = Auth::user();
-    $titre = 'Liste des collaborateurs';
+    public function index(Request $request): View
+    {
+        $user = Auth::user();
+        $titre = 'Liste des collaborateurs';
 
-    // Accès complet pour le Board
-    $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
-                    $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+        // 1. Accès complet (Board / IT / RH / Direction)
+        $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                        $user->hasAnyRole(['IT', 'RH', 'Directeur']);
 
-    $userProjectIds = [];
-    if (!$isFullAccess) {
-        // Sécurité : On passe par l'agent rattaché pour avoir les IDs réels de la table pivot
-        $userProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [];
-        $titre = 'Mes Collaborateurs (Projets rattachés)';
-    }
+        $userProjectIds = [];
+        $specificFunction = null;
 
-    return view($this->templatePath . '.index', compact('titre', 'isFullAccess', 'userProjectIds'));
-}
-    public function ajax(Request $request)
-{
-    $user = Auth::user();
+        if (!$isFullAccess) {
+            // On récupère l'agent connecté pour identifier son site
+            $me = Agent::with('projets')->where('work_email', $user->work_email)->first();
+            $mySiteIds = $me ? $me->projets->pluck('site_id')->unique()->filter()->toArray() : [];
 
-    $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
-                    $user->hasAnyRole(['IT', 'RH', 'Directeur']);
-
-    // Eager loading pour éviter le N+1
-    $query = Agent::with(['projets.site', 'supervisor'])->select('agents.*');
-
-    if (!$isFullAccess) {
-        // On récupère les IDs via l'agent lié au User
-        $userProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [0];
-        
-        $query->whereHas('projets', function($q) use ($userProjectIds) {
-            $q->whereIn('projets.id', $userProjectIds);
-        });
-    }
-
-    return DataTables::of($query)
-        // Colonne SITE
-        ->addColumn('site', function($agent) {
-            // On récupère les désignations des sites via les projets de l'agent
-            $siteNames = $agent->projets->map(function($p) {
-                return $p->site ? $p->site->designation : null;
-            })->filter()->unique();
-
-            if ($siteNames->isEmpty()) return '<span class="text-muted">-</span>';
-            
-            return $siteNames->map(function($name) {
-                return '<div class="site-badge">' . e($name) . '</div>';
-            })->implode(' ');
-        })
-
-        // Colonne PROJET
-        ->addColumn('projet', function($agent) {
-            if ($agent->projets->isEmpty()) return '<span class="text-muted small">Hors projet</span>';
-            
-            return $agent->projets->map(function($p) {
-                return '<span class="badge badge-projet mb-1">' . e($p->designation) . '</span>';
-            })->implode(' ');
-        })
-
-        // Colonne MANAGER
-        ->addColumn('manager_nom', function($agent) {
-            if ($agent->supervisor) {
-                return '<strong>' . strtoupper(e($agent->supervisor->nom)) . '</strong> ' . e($agent->supervisor->prenom);
+            // 2. Vérification des rôles "Top" avec restriction par SITE
+            if ($user->hasAnyRole(['Top Manager', 'Top Formateur', 'Top CQ', 'Top Superviseur'])) {
+                
+                if ($user->hasRole('Top Formateur')) {
+                    $specificFunction = 'FORMATEUR%';
+                    $titre = 'Collaborateurs : Formateurs (Mon Site)';
+                } 
+                elseif ($user->hasRole('Top CQ')) {
+                    $specificFunction = 'CONTRÔLEUR%';
+                    $titre = 'Collaborateurs : Qualité (Mon Site)';
+                } 
+                elseif ($user->hasRole('Top Superviseur')) {
+                    $specificFunction = 'SUPERVISEUR%';
+                    $titre = 'Collaborateurs : Superviseurs (Mon Site)';
+                } 
+                elseif ($user->hasRole('Top Manager')) {
+                    $specificFunction = 'TOP_MANAGEMENT'; // Flag pour la logique de requête
+                    $titre = 'Staff Management (Mon Site)';
+                }
+            } 
+            else {
+                // 3. Accès restreint par projet (Manager standard)
+                $userProjectIds = $me ? $me->projets->pluck('id')->toArray() : [];
+                $titre = 'Mes Collaborateurs (Projets rattachés)';
             }
-            return '<span class="badge bg-light text-secondary border small">DIRECTION</span>';
-        })
+        }
 
-        // Filtre de recherche sur les projets
-        ->filterColumn('projet', function($query, $keyword) {
-            $query->whereHas('projets', function($q) use ($keyword) {
-                $q->where('designation', 'like', "%{$keyword}%");
-            });
-        })
+        return view($this->templatePath . '.index', compact(
+            'titre', 
+            'isFullAccess', 
+            'userProjectIds', 
+            'specificFunction'
+        ));
+    }
 
-        ->rawColumns(['site', 'projet', 'manager_nom']) 
-        ->make(true);
-}
+    public function ajax(Request $request)
+    {
+        $user = Auth::user();
+
+        // 1. Détermination de l'accès complet
+        $isFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                        $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+
+        // 2. Préparation de la requête avec Eager Loading
+        $query = Agent::with(['projets.site', 'supervisor'])->select('agents.*');
+
+        if (!$isFullAccess) {
+            $me = Agent::with('projets')->where('work_email', $user->work_email)->first();
+            
+            // Sécurité : si l'agent n'existe pas en base, on retourne un résultat vide
+            if (!$me) {
+                return DataTables::of(Agent::whereRaw('1 = 0'))->make(true);
+            }
+
+            $mySiteIds = $me->projets->pluck('site_id')->unique()->filter()->toArray();
+            $myProjetIds = $me->projets->pluck('id')->toArray();
+
+            // 3. LOGIQUE DES RÔLES "TOP"
+            if ($user->hasAnyRole(['Top Manager', 'Top Formateur', 'Top CQ', 'Top Superviseur'])) {
+                
+                // --- FILTRE PÉRIMÈTRE (PROJETS VS SITE) ---
+                if ($user->hasRole('Top Superviseur')) {
+                    // Le Top Superviseur est restreint à SES projets uniquement
+                    $query->whereHas('projets', function($q) use ($myProjetIds) {
+                        $q->whereIn('projets.id', $myProjetIds);
+                    });
+                } else {
+                    // Les autres rôles TOP voient tous les projets du SITE
+                    $query->whereHas('projets', function($q) use ($mySiteIds) {
+                        $q->whereIn('site_id', $mySiteIds);
+                    });
+                }
+
+                // --- FILTRE FONCTION (MÉTIER) ---
+                if ($user->hasRole('Top Formateur')) {
+                    $query->where('fonction', 'LIKE', 'FORMATEUR%');
+                } 
+                elseif ($user->hasRole('Top CQ')) {
+                    $query->where('fonction', 'LIKE', 'CONTRÔLEUR%');
+                } 
+                elseif ($user->hasRole('Top Superviseur')) {
+                    $query->where('fonction', 'LIKE', 'SUPERVISEUR%');
+                } 
+                elseif ($user->hasRole('Top Manager')) {
+                    // Le Top Manager voit les 3 catégories sur son site
+                    $query->where(function($q) {
+                        $q->where('fonction', 'LIKE', 'FORMATEUR%')
+                        ->orWhere('fonction', 'LIKE', 'CONTRÔLEUR%')
+                        ->orWhere('fonction', 'LIKE', 'SUPERVISEUR%');
+                    });
+                }
+            } 
+            else {
+                // 4. ACCÈS STANDARD (Manager de projet simple)
+                $query->whereHas('projets', function($q) use ($myProjetIds) {
+                    $q->whereIn('projets.id', $myProjetIds);
+                });
+            }
+        }
+
+        // 5. Génération du flux DataTables
+        return DataTables::of($query)
+            ->addColumn('site', function($agent) {
+                $siteNames = $agent->projets->map(fn($p) => $p->site ? $p->site->designation : null)
+                    ->filter()
+                    ->unique();
+                return $siteNames->isEmpty() 
+                    ? '-' 
+                    : $siteNames->map(fn($n) => '<div class="site-badge">'.e($n).'</div>')->implode(' ');
+            })
+            ->addColumn('projet', function($agent) {
+                if ($agent->projets->isEmpty()) return '<span class="text-muted">Hors projet</span>';
+                return $agent->projets->map(fn($p) => '<span class="badge badge-projet">'.e($p->designation).'</span>')->implode(' ');
+            })
+            ->addColumn('manager_nom', function($agent) {
+                return $agent->supervisor 
+                    ? '<strong>'.strtoupper(e($agent->supervisor->nom)).'</strong> '.e($agent->supervisor->prenom)
+                    : '<span class="badge bg-light text-dark">DIRECTION</span>';
+            })
+            ->rawColumns(['site', 'projet', 'manager_nom']) 
+            ->make(true);
+    }
+
     public function create(): View
     {
         $projets = Projet::all();
@@ -276,14 +336,13 @@ public function index(Request $request): View
         ]);
     }
 
-   
-    public function destroy($id)
-{
-    $agent = Agent::findOrFail($id);
-    $agent->delete();
+        public function destroy($id)
+    {
+        $agent = Agent::findOrFail($id);
+        $agent->delete();
 
-    return redirect()->route('effectif.index')->with('success', 'Agent supprimé avec succès.');
-}
+        return redirect()->route('effectif.index')->with('success', 'Agent supprimé avec succès.');
+    }
 
     
 }

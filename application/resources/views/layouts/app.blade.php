@@ -186,22 +186,22 @@
                     <div class="collapse navbar-collapse" id="navbarNav">
                         <ul class="navbar-nav mx-auto">
                             {{-- Projets accessibles pour IT et RH --}}
-                            @hasanyrole('IT|RH')
+                            @hasanyrole('IT|RH|Top Formateur|Top CQ|Top Superviseur')
                                 <li class="nav-item"><a class="nav-link @routeActive('projet.*')"
                                         href="{{ route('projet.index') }}">Projets</a></li>
                             @endhasanyrole
 
                             {{-- Effectifs pour IT, RH et tous les grades Managers --}}
-                            @hasanyrole('IT|RH|Top Manager|Directeur')
+                            @hasanyrole('IT|RH|Top Manager|Directeur|Top Formateur|Top CQ|Top Superviseur')
                                 <li class="nav-item"><a class="nav-link @routeActive('effectifs')"
                                         href="{{ route('effectifs') }}">Effectifs</a></li>
                             @endhasanyrole
 
                             {{-- Planification pour ceux qui gèrent des équipes --}}
-                            @role('Top Manager')
+                            @hasanyrole('Top Manager|Top Formateur|Top CQ|Top Superviseur')
                                 <li class="nav-item"><a class="nav-link @routeActive('planification')"
                                         href="{{ route('planification') }}">Planification</a></li>
-                            @endrole
+                            @endhasanyrole
 
 
                             @role('Manager')
@@ -215,7 +215,7 @@
                                     href="{{ route('pointage.index') }}">Pointages</a></li>
 
                             {{-- Administration : Uniquement IT --}}
-                            @hasanyrole('IT|RH|Top Manager|Directeur')
+                            @hasanyrole('IT|RH|Top Manager|Directeur|Top Formateur|Top CQ|Top Superviseur')
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle @routeActive('permission.*|users.*')" href="#"
                                         data-bs-toggle="dropdown">Plannings</a>

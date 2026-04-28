@@ -16,93 +16,130 @@ class PointageController extends Controller
      * DASHBOARD : Vue du tableau de bord filtrée par périmètre.
      */
     public function index(): View
-    {
-        $user = Auth::user();
-        $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
-                 $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+{
+    $user = Auth::user();
+    $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                     $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+    
+    if ($hasFullAccess) {
+        $sites = Projet::select('site_id')->distinct()->whereNotNull('site_id')->pluck('site_id');
+        $projetsList = Projet::orderBy('designation')->get();
+    } else {
+        // Récupération de l'agent connecté pour connaître ses sites et projets
+        $agentConnecte = Agent::with('projets.site')->where('work_email', $user->work_email)->firstOrFail();
+        $mySiteIds = $agentConnecte->projets->pluck('site_id')->unique()->filter();
         
-        
-        if ($hasFullAccess) {
-            // Admin voit tout
-            $sites = Projet::select('site_id')->distinct()->whereNotNull('site_id')->pluck('site_id');
-            $projetsList = Projet::orderBy('designation')->get();
+        // Si c'est un rôle "Top", il voit tous les projets de SON site
+        if ($user->hasAnyRole(['Top Manager', 'Top Formateur', 'Top CQ', 'Top Superviseur'])) {
+            $sites = $mySiteIds;
+            $projetsList = Projet::whereIn('site_id', $mySiteIds)->orderBy('designation')->get();
         } else {
-            // Manager ne voit que son périmètre
-            $agentConnecte = Agent::with('projets')->where('work_email', $user->work_email)->firstOrFail();
-            $sites = $agentConnecte->projets->pluck('site_id')->unique()->filter();
+            // Manager standard : uniquement ses projets rattachés
+            $sites = $mySiteIds;
             $projetsList = $agentConnecte->projets;
         }
-
-        return view('pointages.group', [
-            'sites' => $sites,
-            'projetsList' => $projetsList,
-            'semaines' => $this->generateWeekRange(),
-            'selectedWeek' => now()->weekOfYear,
-            'isManager' => !$hasFullAccess
-        ]);
     }
 
-    /**
-     * API AJAX : Données pour le tableau de comparaison (Planning vs Réel)
-     */
-      public function getPointageData(Request $request): JsonResponse
-    {
-        try {
-            $user = Auth::user();
+    return view('pointages.group', [
+        'sites' => $sites,
+        'projetsList' => $projetsList,
+        'semaines' => $this->generateWeekRange(),
+        'selectedWeek' => now()->weekOfYear,
+        'isManager' => !$hasFullAccess
+    ]);
+}
 
-            $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
-            $user->hasAnyRole(['IT', 'RH', 'Directeur']);
-            
-            // 1. Définition des dates de la semaine
-            $weekNum = (int)$request->input('week', now()->weekOfYear);
-            $dateDebut = now()->setISODate(now()->year, $weekNum)->startOfWeek();
-            $dates = [];
-            for ($i = 0; $i < 7; $i++) { 
-                $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d'); 
-            }
 
-            // 2. Filtrage des projets autorisés
-            $projets = Projet::query()
-                ->when(!$hasFullAccess, function($q) use ($user) {
-                    $q->whereHas('agents', fn($a) => $a->where('work_email', $user->work_email));
-                })
-                ->when($request->site_id, fn($q) => $q->where('site_id', $request->site_id))
-                ->when($request->projet_id && $request->projet_id !== 'null', fn($q) => $q->where('id', $request->projet_id))
-                ->get();
-
-            // 3. Récupération des emails ayant le rôle 'Manager'
-            $managerEmails = DB::table('users')
-                ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
-                ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
-                ->where('roles.name', 'Manager')
-                ->pluck('users.work_email')->toArray();
-
-            $resultat = [];
-            foreach ($projets as $projet) {
-                // Eager loading pour éviter le N+1
-                $agentsDuProjet = Agent::whereHas('projets', fn($q) => $q->where('projets.id', $projet->id))
-                    ->whereIn('work_email', $managerEmails)->get();
-
-                $superviseursData = [];
-                foreach ($agentsDuProjet as $agent) {
-                    $superviseursData[] = [
-                        'nom' => "{$agent->prenom} {$agent->nom}",
-                        'fonction' => $agent->fonction ?? 'MANAGER',
-                        'stats' => $this->mapStats($agent->id, $dates)
-                    ];
-                }
-
-                if (!empty($superviseursData)) {
-                    $resultat[] = ['projet' => $projet->designation, 'superviseurs' => $superviseursData];
-                }
-            }
-
-            return response()->json(['dates' => $dates, 'resultat' => $resultat]);
-        } catch (\Exception $e) {
-            Log::error("Erreur API Pointage Data: " . $e->getMessage());
-            return response()->json(['error' => "Erreur interne"], 500);
+public function getPointageData(Request $request): JsonResponse
+{
+    try {
+        $user = Auth::user();
+        $hasFullAccess = ($user->work_email === 'admin@concentrix.com') || 
+                         $user->hasAnyRole(['IT', 'RH', 'Directeur']);
+        
+        // 1. Définition des dates (Année 2026)
+        $weekNum = (int)$request->input('week', now()->weekOfYear);
+        $dateDebut = now()->setISODate(2026, $weekNum)->startOfWeek(); 
+        $dates = [];
+        for ($i = 0; $i < 7; $i++) { 
+            $dates[] = $dateDebut->copy()->addDays($i)->format('Y-m-d'); 
         }
+
+        // 2. Récupération des infos du Manager connecté
+        $me = Agent::with('projets')->where('work_email', $user->work_email)->first();
+        $mySiteIds = $me ? $me->projets->pluck('site_id')->unique()->filter()->toArray() : [];
+
+        // 3. Filtrage des projets (Périmètre)
+        $projets = Projet::query()
+            ->when(!$hasFullAccess, function($q) use ($user, $mySiteIds) {
+                // Top Formateur et Top CQ : voient tout le SITE
+                if ($user->hasAnyRole(['Top Formateur', 'Top CQ'])) {
+                    $q->whereIn('site_id', $mySiteIds);
+                } 
+                // Top Superviseur, Top Manager et Standard : voient uniquement leurs PROJETS
+                else {
+                    $q->whereHas('agents', fn($a) => $a->where('work_email', $user->work_email));
+                }
+            })
+            ->when($request->site_id, fn($q) => $q->where('site_id', $request->site_id))
+            ->when($request->projet_id && $request->projet_id !== 'null', fn($q) => $q->where('id', $request->projet_id))
+            ->get();
+
+        // 4. Liste des emails avec le rôle 'Manager'
+        $managerEmails = DB::table('users')
+            ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
+            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+            ->where('roles.name', 'Manager')
+            ->pluck('users.work_email')->toArray();
+
+        $resultat = [];
+        foreach ($projets as $projet) {
+            $queryAgents = Agent::whereHas('projets', fn($q) => $q->where('projets.id', $projet->id))
+                                ->whereIn('work_email', $managerEmails);
+
+            // --- FILTRAGE PAR FONCTION (MÉTIER) ---
+            if (!$hasFullAccess) {
+                if ($user->hasRole('Top Formateur')) {
+                    $queryAgents->where('fonction', 'LIKE', 'FORMATEUR%');
+                } elseif ($user->hasRole('Top CQ')) {
+                    $queryAgents->where('fonction', 'LIKE', 'CONTRÔLEUR%');
+                } elseif ($user->hasRole('Top Superviseur')) {
+                    $queryAgents->where('fonction', 'LIKE', 'SUPERVISEUR%');
+                } elseif ($user->hasRole('Top Manager')) {
+                    $queryAgents->where(function($q) {
+                        $q->where('fonction', 'LIKE', 'FORMATEUR%')
+                          ->orWhere('fonction', 'LIKE', 'CONTRÔLEUR%')
+                          ->orWhere('fonction', 'LIKE', 'SUPERVISEUR%');
+                    });
+                }
+            }
+
+            $agentsDuProjet = $queryAgents->get();
+
+            $superviseursData = [];
+            foreach ($agentsDuProjet as $agent) {
+                $superviseursData[] = [
+                    'nom' => "{$agent->prenom} {$agent->nom}",
+                    'fonction' => $agent->fonction ?? 'MANAGER',
+                    'stats' => $this->mapStats($agent->id, $dates)
+                ];
+            }
+
+            if (!empty($superviseursData)) {
+                $resultat[] = [
+                    'projet' => $projet->designation, 
+                    'superviseurs' => $superviseursData
+                ];
+            }
+        }
+
+        return response()->json(['dates' => $dates, 'resultat' => $resultat]);
+
+    } catch (\Exception $e) {
+        Log::error("Erreur API Pointage Data: " . $e->getMessage());
+        return response()->json(['error' => "Erreur interne"], 500);
     }
+}
 
     /**
      * AGENT : Interface de pointage (Check-in/Check-out)
@@ -224,17 +261,25 @@ class PointageController extends Controller
     return $stats;
 }
 
-    private function generateWeekRange(): array
-    {
-        $semaines = [];
-        $current = now()->weekOfYear;
-        for ($i = $current - 3; $i <= $current + 3; $i++) {
-            if ($i < 1 || $i > 53) continue;
-            $start = now()->setISODate(now()->year, $i)->startOfWeek();
-            $semaines[] = ['numero' => $i, 'debut' => $start->format('d/m'), 'label' => "Semaine $i"];
-        }
-        return $semaines;
+private function generateWeekRange(): array
+{
+    $semaines = [];
+    $year = now()->year;
+    $currentWeek = now()->weekOfYear; // Semaine actuelle (ex: 18)
+
+    // On boucle de la semaine 1 jusqu'à la semaine actuelle uniquement
+    for ($i = 1; $i <= $currentWeek; $i++) {
+        $start = now()->setISODate($year, $i)->startOfWeek();
+        
+        $semaines[] = [
+            'numero' => $i,
+            'debut'  => $start->format('d/m'),
+            'label'  => "Semaine $i"
+        ];
     }
+
+    return $semaines;
+}
 
 
  public function apiData(Request $request)
@@ -321,38 +366,42 @@ class PointageController extends Controller
 
 
 public function exportExcel(Request $request) 
-    {
-        $user = auth()->user();
-        
-        // On récupère la semaine (formatée sur 2 chiffres pour la propreté)
-        $week = $request->week ? str_pad($request->week, 2, '0', STR_PAD_LEFT) : date('W');
-        
-        // 1. Définition des accès (Lead Dev : centralisation des droits)
-        $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
+{
+    $user = auth()->user();
+    
+    // 1. Récupération des dates (Lead Dev : Fallback sur la semaine actuelle si vide)
+    $dateDebut = $request->date_debut ?? now()->startOfWeek()->format('Y-m-d');
+    $dateFin = $request->date_fin ?? now()->endOfWeek()->format('Y-m-d');
+    
+    // 2. Définition des accès
+    $isFullAccess = $user->hasAnyRole(['IT', 'RH', 'Directeur']) || ($user->work_email === 'admin@concentrix.com');
 
-        // 2. Restriction de périmètre pour les Managers
-        $restrictedProjectIds = null;
-        if (!$isFullAccess) {
-            $restrictedProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [0];
-            
-            if ($request->projet_id && !in_array($request->projet_id, $restrictedProjectIds)) {
-                return abort(403, "Accès non autorisé à ce projet.");
-            }
+    // 3. Restriction de périmètre pour les Managers
+    $restrictedProjectIds = null;
+    if (!$isFullAccess) {
+        $restrictedProjectIds = $user->agent ? $user->agent->projets->pluck('id')->toArray() : [0];
+        
+        if ($request->projet_id && !in_array($request->projet_id, $restrictedProjectIds)) {
+            return abort(403, "Accès non autorisé à ce projet.");
         }
-
-        $fileName = "Export_Pointage_S{$week}_" . now()->format('Ymd_His') . ".xlsx";
-
-        // 3. Appel de la classe d'export avec les bons paramètres
-        return Excel::download(
-            new PointageExport(
-                $request->site_id, 
-                $request->projet_id, 
-                $week, 
-                $isFullAccess, 
-                $restrictedProjectIds
-            ), 
-            $fileName
-        );
     }
+
+    // 4. Nom du fichier dynamique (format : Export_du_2024-05-01_au_2024-05-07)
+    $fileName = "Export_Pointage_du_{$dateDebut}_au_{$dateFin}_" . now()->format('His') . ".xlsx";
+
+    // 5. Appel de la classe d'export
+    // Note : On remplace $week par un tableau ou deux variables selon ce que ta classe PointageExport attend
+    return Excel::download(
+        new PointageExport(
+            $request->site_id, 
+            $request->projet_id, 
+            $dateDebut, // Passé à la place de $week
+            $dateFin,   // Nouvel argument
+            $isFullAccess, 
+            $restrictedProjectIds
+        ), 
+        $fileName
+    );
+}
 
 }

@@ -138,15 +138,9 @@
             <div class="col-12 d-flex align-items-center justify-content-between">
                 <div>
                     <h1 class="fw-bold text-dark mb-0" style="letter-spacing: -1.5px;">
-                        <i class="fas fa-chart-line text-primary me-3"></i>Intelligence Center
-                    </h1>
-                    <p class="text-muted mb-0 ps-5">Analytics & Adhérence RH | <span class="fw-bold text-primary">v2.5
-                            BI-Ready</span></p>
-                </div>
-                <div class="text-end">
-                    <button onclick="downloadSection('full-dashboard')" class="btn btn-dark rounded-pill shadow-sm px-4">
-                        <i class="fas fa-camera me-2"></i>Snapshot Report
-                    </button>
+    <i class="fas fa-microchip text-primary me-3"></i>ManagerPoint<span class="text-primary">CNX</span>
+</h1>
+<p class="text-muted mb-0 ps-5">Intelligence Center | Analytics & Adhérence RH | CNX</p>
                 </div>
             </div>
         </div>

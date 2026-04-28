@@ -143,7 +143,6 @@
                                 <th>Fonction</th>
                                 <th>Email Professionnel</th>
                                 <th>Projet(s)</th>
-                                <th>Responsable Direct</th>
                                 @if (auth()->user()->hasAnyRole(['RH', 'IT']))
                                     <th class="text-center">Actions</th>
                                 @endif
@@ -218,11 +217,7 @@
                             return output;
                         }
                     },
-                    {
-                        data: 'manager_nom',
-                        name: 'manager_nom',
-                        render: data => `<span class="text-secondary small"><i class="fas fa-user-check me-1 opacity-50"></i>${data || 'DIRECTION'}</span>`
-                    }
+                   
                 ];
 
                 if (canEdit) {

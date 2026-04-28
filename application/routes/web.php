@@ -65,7 +65,7 @@ Route::get('/pointage/export/excel', [PointageController::class, 'exportExcel'])
     });
 });
 
-Route::middleware(['auth', 'role:RH|IT|Manager|Top Manager|Directeur'])->group(function () {
+Route::middleware(['auth', 'role:RH|IT|Manager|Top Manager|Directeur|Top Superviseur|Top CQ|Top Formateur'])->group(function () {
     Route::prefix('effectif')->group(function () {
         Route::get('/liste', [AgentController::class, 'index'])->name('effectifs'); 
         Route::get('/create', [AgentController::class, 'create'])->name('effectif.create');
