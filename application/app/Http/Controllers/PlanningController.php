@@ -511,74 +511,132 @@ class PlanningController extends Controller
         return $semaines;
     }
 
+   
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'plannings' => 'required|array',
-            'week' => 'required|integer' // On reçoit le numéro (ex: 9)
+            'week' => 'required|integer|min:1|max:53',
         ]);
 
-        $authUserId = Auth::id();
+        $authUser = Auth::user();
+        $authUserId = $authUser->id;
         $today = now()->startOfDay();
-        $selectedYear = 2026; 
-        // On recrée le format YYYY-WW pour la base de données
-        $weekFormat = $selectedYear . '-' . str_pad($request->input('week'), 2, '0', STR_PAD_LEFT);
+        $selectedYear = 2026;
 
-        // 1. Vérification des droits de Melissa (Top Manager)
-        $topManager = Agent::with('projets')->where('work_email', Auth::user()->work_email)->firstOrFail();
+        $weekFormat = $selectedYear . '-' . str_pad($request->week, 2, '0', STR_PAD_LEFT);
+
+        $topManager = Agent::with('projets')
+            ->where('work_email', $authUser->work_email)
+            ->firstOrFail();
+
         $allowedProjetIds = $topManager->projets->pluck('id')->toArray();
 
-        // 2. Pré-chargement de tous les agents concernés pour éviter les requêtes en boucle (N+1)
-        $submittedAgentIds = array_keys($request->input('plannings'));
-        $agentsCibles = Agent::with('projets')->whereIn('id', $submittedAgentIds)->get()->keyBy('id');
+        $submittedAgentIds = array_keys($request->plannings);
+
+        $agentsCibles = Agent::with('projets')
+            ->whereIn('id', $submittedAgentIds)
+            ->get()
+            ->keyBy('id');
 
         try {
             DB::beginTransaction();
 
-            foreach ($request->input('plannings') as $agentId => $jours) {
+            foreach ($request->plannings as $agentId => $jours) {
                 $agent = $agentsCibles->get($agentId);
 
-                // Vérification de sécurité : l'agent appartient-il aux projets de Melissa ?
-                if (!$agent || empty(array_intersect($allowedProjetIds, $agent->projets->pluck('id')->toArray()))) {
+                if (!$agent) {
+                    continue;
+                }
+
+                $canModify = false;
+                $agentFonction = strtolower(trim($agent->fonction ?? ''));
+
+                // 1. Top Manager : peut modifier les agents/managers de ses projets
+                if (
+                    $authUser->hasRole('Top Manager') &&
+                    !empty(array_intersect(
+                        $allowedProjetIds,
+                        $agent->projets->pluck('id')->toArray()
+                    ))
+                ) {
+                    $canModify = true;
+                }
+
+                // 2. Top Formateur : peut modifier les formateurs de son site
+                if (
+                    $authUser->hasRole('Top Formateur') &&
+                    $agent->site_id === $topManager->site_id &&
+                    str_starts_with($agentFonction, 'formateur')
+                ) {
+                    $canModify = true;
+                }
+
+                // 3. Top CQ : peut modifier les contrôleurs qualité de son site
+                if (
+                    $authUser->hasRole('Top CQ') &&
+                    $agent->site_id === $topManager->site_id &&
+                    (
+                        str_starts_with($agentFonction, 'cq') ||
+                        str_starts_with($agentFonction, 'controlleur qualité') ||
+                        str_starts_with($agentFonction, 'controleur qualité') ||
+                        str_starts_with($agentFonction, 'contrôleur qualité')
+                    )
+                ) {
+                    $canModify = true;
+                }
+
+                if (!$canModify) {
                     continue;
                 }
 
                 foreach ($jours as $date => $heures) {
-                    // Interdiction de modifier le passé
                     if (Carbon::parse($date)->startOfDay()->isBefore($today)) {
                         continue;
                     }
 
-                    // Si les deux champs sont vides, on peut choisir de supprimer ou d'ignorer
-                    if (empty($heures['entree']) && empty($heures['sortie'])) {
-                        // Optionnel : Supprimer l'entrée si Melissa a effacé les heures
-                        // Planning::where('agent_id', $agentId)->where('jour', $date)->delete();
+                    $entree = $heures['entree'] ?? null;
+                    $sortie = $heures['sortie'] ?? null;
+
+                    if (empty($entree) && empty($sortie)) {
                         continue;
                     }
 
-                    // Enregistrement avec le format de semaine correct
                     Planning::updateOrCreate(
                         [
-                            'agent_id' => $agentId, 
-                            'jour'     => $date
+                            'agent_id' => $agentId,
+                            'jour' => $date,
                         ],
                         [
-                            'entree'   => $heures['entree'],
-                            'sortie'   => $heures['sortie'],
-                            'semaine'  => $weekFormat, // Format 2026-09
-                            'user_id'  => $authUserId
+                            'entree' => $entree,
+                            'sortie' => $sortie,
+                            'semaine' => $weekFormat,
+                            'user_id' => $authUserId,
                         ]
                     );
                 }
             }
 
             DB::commit();
-            return back()->with('success', "Planning de la semaine {$request->input('week')} enregistré avec succès.");
+
+            return back()->with(
+                'success',
+                "Planning de la semaine {$request->week} enregistré avec succès."
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Erreur lors de l'enregistrement manuel : " . $e->getMessage());
-            return back()->with('error', "Une erreur technique est survenue. Vérifiez les logs.");
+
+            Log::error("Erreur lors de l'enregistrement du planning manuel", [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return back()->with(
+                'error',
+                "Une erreur technique est survenue. Vérifiez les logs."
+            );
         }
     }
 
@@ -685,122 +743,175 @@ class PlanningController extends Controller
         ];
     }
 
-    public function pasteImport(Request $request)
-    {
-        // 1. Validation de base
-        $request->validate([
-            'pasted_data' => 'required',
-            'week' => 'required|integer' 
-        ]);
+  public function pasteImport(Request $request)
+{
+    $request->validate([
+        'pasted_data' => 'required',
+        'week' => 'required|integer|min:1|max:53',
+    ]);
 
-        $user = auth()->user();
-        $data = $request->input('pasted_data');
-        $today = now()->startOfDay();
+    $user = auth()->user();
+    $data = $request->input('pasted_data');
+    $today = now()->startOfDay();
 
-        // 2. 🔐 Vérification des Rôles (Identique à l'import Excel)
-        $isAdmin = $user->hasRole('Admin IT');
-        $isTopManager = $user->hasRole('Top Manager');
+    $isAdmin = $user->hasRole('Admin IT');
+    $isTopManager = $user->hasRole('Top Manager');
+    $isTopFormateur = $user->hasRole('Top Formateur');
+    $isTopCQ = $user->hasRole('Top CQ');
 
-        if (!$isAdmin && !$isTopManager) {
-            return back()->with('error', "Accès refusé : Votre rôle ne permet pas l'importation.");
+    if (!$isAdmin && !$isTopManager && !$isTopFormateur && !$isTopCQ) {
+        return back()->with('error', "Accès refusé : votre rôle ne permet pas l'importation.");
+    }
+
+    $currentAgent = Agent::with('projets')
+        ->where('work_email', $user->work_email)
+        ->first();
+
+    if (!$isAdmin && !$currentAgent) {
+        return back()->with('error', "Profil agent introuvable pour l'email : {$user->work_email}");
+    }
+
+    $allowedProjetIds = $currentAgent
+        ? $currentAgent->projets->pluck('id')->toArray()
+        : [];
+
+    $lines = explode("\n", str_replace("\r", "", trim($data)));
+    $successCount = 0;
+    $errors = [];
+
+    foreach ($lines as $index => $line) {
+        $columns = explode("\t", $line);
+
+        if ($index === 0 && isset($columns[0], $columns[1]) && (
+            str_contains(strtolower($columns[0]), 'id') ||
+            str_contains(strtolower($columns[1]), 'date')
+        )) {
+            continue;
         }
 
-        // 3. 🌍 Portée (Scope) pour le Top Manager
-        $allowedProjetIds = [];
-        if ($isTopManager && !$isAdmin) {
-            $currentAgent = Agent::with('projets')
-                ->where('work_email', $user->work_email) 
+        if (count($columns) < 2) {
+            continue;
+        }
+
+        try {
+            $workdayIdExcel = trim($columns[0]);
+            $rawDate = trim($columns[1]);
+
+            $targetAgent = Agent::with(['projets', 'user.roles'])
+                ->where('workday_id', $workdayIdExcel)
                 ->first();
 
-            if (!$currentAgent) {
-                return back()->with('error', "Profil agent introuvable pour l'email : {$user->work_email}");
+            if (!$targetAgent || !$targetAgent->user) {
+                throw new \Exception("Agent non trouvé ou sans utilisateur lié (ID: $workdayIdExcel)");
             }
-            $allowedProjetIds = $currentAgent->projets->pluck('id')->toArray();
-        }
 
-        $lines = explode("\n", str_replace("\r", "", trim($data)));
-        $successCount = 0;
-        $errors = [];
+            $targetFonction = strtolower(trim($targetAgent->fonction ?? ''));
+            $canImport = false;
 
-        foreach ($lines as $index => $line) {
-            $columns = explode("\t", $line);
+            // Admin IT : accès total
+            if ($isAdmin) {
+                $canImport = true;
+            }
 
-            // Ignorer l'en-tête
-            if ($index === 0 && (str_contains(strtolower($columns[0]), 'id') || str_contains(strtolower($columns[1]), 'date'))) {
+            // Top Manager : uniquement les Managers de ses projets
+            if (
+                $isTopManager &&
+                $targetAgent->user->hasRole('Manager') &&
+                !empty(array_intersect(
+                    $allowedProjetIds,
+                    $targetAgent->projets->pluck('id')->toArray()
+                ))
+            ) {
+                $canImport = true;
+            }
+
+            // Top Formateur : uniquement les Formateurs de son site
+            if (
+                $isTopFormateur &&
+                $targetAgent->site_id === $currentAgent->site_id &&
+                (
+                    $targetAgent->user->hasRole('Formateur') ||
+                    str_starts_with($targetFonction, 'formateur')
+                )
+            ) {
+                $canImport = true;
+            }
+
+            // Top CQ : uniquement les CQ / Contrôleurs qualité de son site
+            if (
+                $isTopCQ &&
+                $targetAgent->site_id === $currentAgent->site_id &&
+                (
+                    $targetAgent->user->hasRole('CQ') ||
+                    str_starts_with($targetFonction, 'cq') ||
+                    str_starts_with($targetFonction, 'controlleur qualité') ||
+                    str_starts_with($targetFonction, 'controleur qualité') ||
+                    str_starts_with($targetFonction, 'contrôleur qualité')
+                )
+            ) {
+                $canImport = true;
+            }
+
+            if (!$canImport) {
+                throw new \Exception("Vous n'avez pas les droits sur cet agent (ID: $workdayIdExcel)");
+            }
+
+            try {
+                $dateObj = str_contains($rawDate, '/')
+                    ? \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)
+                    : \Carbon\Carbon::parse($rawDate);
+            } catch (\Exception $e) {
+                throw new \Exception("Date invalide : $rawDate");
+            }
+
+            if ($dateObj->copy()->startOfDay()->isBefore($today)) {
                 continue;
             }
 
-            if (count($columns) >= 2) {
-                try {
-                    $workdayIdExcel = trim($columns[0]); 
-                    $rawDate = trim($columns[1]);
-                    
-                    // 4. Recherche de l'agent cible et vérification des droits
-                    $targetAgent = Agent::with(['projets', 'user.roles'])
-                        ->where('workday_id', $workdayIdExcel)
-                        ->first();
+            $entree = isset($columns[2]) && strtoupper(trim($columns[2])) !== 'OFF'
+                ? trim($columns[2])
+                : null;
 
-                    // Règle : Agent existant et rôle Manager
-                    if (!$targetAgent || !$targetAgent->user || !$targetAgent->user->hasRole('Manager')) {
-                        throw new \Exception("Agent non trouvé ou n'est pas un Manager (ID: $workdayIdExcel)");
-                    }
+            $sortie = isset($columns[3]) && strtoupper(trim($columns[3])) !== 'OFF'
+                ? trim($columns[3])
+                : null;
 
-                    // Règle : Restriction projet pour Top Manager
-                    if ($isTopManager && !$isAdmin) {
-                        $targetProjetIds = $targetAgent->projets->pluck('id')->toArray();
-                        if (empty(array_intersect($allowedProjetIds, $targetProjetIds))) {
-                            throw new \Exception("Vous n'avez pas les droits sur le projet de cet agent (ID: $workdayIdExcel)");
-                        }
-                    }
+            $weekISO = $dateObj->format('o-W');
 
-                    // 5. Traitement de la Date
-                    try {
-                        $dateObj = str_contains($rawDate, '/') 
-                            ? \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)
-                            : \Carbon\Carbon::parse($rawDate);
-                    } catch (\Exception $e) {
-                        throw new \Exception("Date invalide : $rawDate");
-                    }
+            Planning::updateOrCreate(
+                [
+                    'agent_id' => $targetAgent->id,
+                    'jour' => $dateObj->format('Y-m-d'),
+                ],
+                [
+                    'entree' => $entree,
+                    'sortie' => $sortie,
+                    'semaine' => $weekISO,
+                    'user_id' => $user->id,
+                ]
+            );
 
-                    // Sécurité : Pas de modifications dans le passé (comme dans ton Excel)
-                    if ($dateObj->startOfDay()->isBefore($today)) {
-                        continue; 
-                    }
+            $successCount++;
 
-                    // 6. Formatage Heures et Semaine
-                    $entree = !empty($columns[2]) && strtoupper(trim($columns[2])) !== 'OFF' ? trim($columns[2]) : null;
-                    $sortie = !empty($columns[3]) && strtoupper(trim($columns[3])) !== 'OFF' ? trim($columns[3]) : null;
-                    $weekISO = $dateObj->format('o-W');
-
-                    // 7. Sauvegarde
-                    \App\Models\Planning::updateOrCreate(
-                        [
-                            'agent_id' => $targetAgent->id,
-                            'jour'     => $dateObj->format('Y-m-d')
-                        ],
-                        [
-                            'entree'   => $entree,
-                            'sortie'   => $sortie,
-                            'semaine'  => $weekISO,
-                            'user_id'  => $user->id
-                        ]
-                    );
-
-                    $successCount++;
-                } catch (\Exception $e) {
-                    $errors[] = "Ligne " . ($index + 1) . " : " . $e->getMessage();
-                }
-            }
+        } catch (\Exception $e) {
+            $errors[] = "Ligne " . ($index + 1) . " : " . $e->getMessage();
         }
-
-        // 8. Feedback
-        if (count($errors) > 0) {
-            $errorPreview = implode(' | ', array_slice($errors, 0, 2));
-            return back()->with('error', "$successCount importés. Erreurs : $errorPreview" . (count($errors) > 2 ? "..." : ""));
-        }
-
-        return back()->with('success', "Importation réussie : $successCount lignes de planning traitées.");
     }
+
+    if (count($errors) > 0) {
+        $errorPreview = implode(' | ', array_slice($errors, 0, 2));
+
+        return back()->with(
+            'error',
+            "$successCount importés. Erreurs : $errorPreview" . (count($errors) > 2 ? "..." : "")
+        );
+    }
+
+    return back()->with(
+        'success',
+        "Importation réussie : $successCount lignes de planning traitées."
+    );
+}
 
 }
 

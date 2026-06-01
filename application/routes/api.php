@@ -27,11 +27,3 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/agents', [AgentController::class, 'index'])->name('new');
 
-
-
-
-
-
-
-Route::get('/taux-absence', [HomeController::class, 'tauxAbsence']);
-

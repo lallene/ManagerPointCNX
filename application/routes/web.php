@@ -28,7 +28,6 @@ Route::group(['prefix' => 'configuration/projet', 'as' => 'projet.'], function (
     Route::get('/', [ProjetController::class, 'index'])->name('index');
     Route::get('/create', [ProjetController::class, 'create'])->name('create');
     Route::post('/store', [ProjetController::class, 'store'])->name('store');
-
     Route::get('/{projet}/edit', [ProjetController::class, 'edit'])->name('edit');
     Route::put('/{projet}', [ProjetController::class, 'update'])->name('update');
     Route::delete('/{projet}', [ProjetController::class, 'destroy'])->name('destroy');
@@ -38,7 +37,6 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/change-password', [LoginController::class, 'showChangePasswordForm'])->name('changePassword');
     Route::post('/update-password', [LoginController::class, 'updatePassword'])->name('updatePassword');
-
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -51,7 +49,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/api/projets-by-site', [PointageController::class, 'getProjetsBySite'])->name('api.projets.by.site');
         Route::get('/group', [PointageController::class, 'index'])->name('index');
         Route::get('/data', [PointageController::class, 'apiData'])->name('api.data');
-Route::get('/pointage/export/excel', [PointageController::class, 'exportExcel'])->name('pointage.export.excel');
+        Route::get('/pointage/export/excel', [PointageController::class, 'exportExcel'])->name('pointage.export.excel');
 
     });
 
@@ -92,12 +90,9 @@ Route::middleware(['auth', 'role:IT'])->prefix('configuration')->group(function 
   //  Route::resource('projet', ProjetController::class)->except(['show']);
     Route::resource('site', SiteController::class)->except(['show']);
     Route::post('/projet/import', [ProjetController::class, 'import'])->name('projet.import');
-    
     Route::get('/users/ajax', [UtilisateurController::class, 'ajax'])->name('users.ajax');
     Route::resource('users', UtilisateurController::class);
 });
-
-
 
 Route::get('/planning/global', [PlanningController::class, 'PlanningGlobal'])->name('planning.global');
 Route::post('/planning/import-grid', [PlanningController::class, 'importGrid']);
